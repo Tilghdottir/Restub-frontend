@@ -1,0 +1,10 @@
+{
+  "description": "This ticket resale platform connects buyers and sellers, enabling secure transactions for event tickets while ensuring fair pricing and easy access.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}
