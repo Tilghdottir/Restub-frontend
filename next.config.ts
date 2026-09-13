@@ -3,6 +3,7 @@ import type { NextConfig } from 'next'
 const nextConfig: NextConfig = {
   output: 'export',
   distDir: 'dist',
+  basePath: '/Restub-frontend',
   trailingSlash: true,
   images: {
     unoptimized: true,
