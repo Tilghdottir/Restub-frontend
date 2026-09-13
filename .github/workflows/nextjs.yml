@@ -70,6 +70,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v5
         with:
+          node-version: "24"
           registry-url: ${{ steps.detect-package-manager.outputs.registry }}
           cache: ${{ steps.detect-package-manager.outputs.manager }}
       - name: Setup Pages
@@ -91,7 +92,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: ./out
+          path: ./dist
 
   # Deployment job
   deploy:
