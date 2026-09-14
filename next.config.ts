@@ -1,13 +1,16 @@
-import type { NextConfig } from 'next'
+import type { NextConfig } from "next"
+import { PHASE_DEVELOPMENT_SERVER } from "next/constants"
 
-const nextConfig: NextConfig = {
-  output: 'export',
-  distDir: 'dist',
-  basePath: '/Restub-frontend',
-  trailingSlash: true,
-  images: {
-    unoptimized: true,
-  },
+export default function nextConfig(phase: string): NextConfig {
+  const isDevelopment = phase === PHASE_DEVELOPMENT_SERVER
+
+  return {
+    output: "export",
+    distDir: "dist",
+    basePath: isDevelopment ? "" : "/Restub-frontend",
+    trailingSlash: true,
+    images: {
+      unoptimized: true,
+    },
+  }
 }
-
-export default nextConfig
