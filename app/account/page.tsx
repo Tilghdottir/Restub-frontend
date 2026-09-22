@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
-import Header from "../components/Header"
+import AccountSidebar from "../components/AccountSidebar"
 import { apiClient } from "../lib/api"
 import type {
   AccountSummaryResponse,
@@ -27,9 +27,9 @@ export default function AccountPage() {
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: "#FAFAF7" }}>
-      <Header />
+      <AccountSidebar />
 
-      <main className="max-w-5xl mx-auto px-6 py-8">
+      <main className="lg:ml-64 max-w-5xl mx-auto px-6 py-8">
         <div className="mb-6">
           <p
             className="text-[11px] font-medium tracking-widest uppercase mb-2"
@@ -150,8 +150,9 @@ export default function AccountPage() {
               </div>
             ) : (
               listings.map((listing: ListingSummary) => (
-                <div
+                <Link
                   key={listing.id}
+                  href={`/account/listings?id=${encodeURIComponent(listing.id)}`}
                   className="bg-white border rounded-lg p-5 flex flex-col gap-4 md:flex-row md:items-center md:justify-between"
                   style={{ borderColor: "#E8E9EB" }}
                 >
@@ -197,7 +198,7 @@ export default function AccountPage() {
                       {listing.status}
                     </span>
                   </div>
-                </div>
+                </Link>
               ))
             )}
           </div>

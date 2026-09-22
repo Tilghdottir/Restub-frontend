@@ -1,25 +1,36 @@
 import type {
   AccountSummaryResponse,
+  AuthTokenResponse,
+  AuthUserResponse,
   CheckoutRequest,
   CheckoutResponse,
+  CreatePayoutAccountRequest,
   CreateListingRequest,
   DisputeSummary,
   KycCaseSummary,
+  KycApiRecord,
   KycProfile,
   ListingApiRecord,
+  ListingPageResponse,
   ListingSummary,
   NotificationSummary,
   OrderDetailResponse,
   OrderSummary,
   PaymentMethod,
   PayoutAccount,
+  PayoutAccountApiRecord,
   RefundSummary,
+  SubmitKycRequest,
   TicketSummary,
   TransactionSummary,
 } from "./api-types"
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3000/api"
+const API_BASE_URL = (
+  process.env.NEXT_PUBLIC_API_BASE_URL ??
+  (process.env.NODE_ENV === "production"
+    ? "https://restub.onrender.com/api"
+    : "http://localhost:3000/api")
+).replace(/\/+$/, "")
 
 type JsonRecord = Record<string, unknown>
 
@@ -49,7 +60,22 @@ function asBoolean(value: unknown, fallback = false): boolean {
   return typeof value === "boolean" ? value : fallback
 }
 
-async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+function createIdempotencyKey(): string {
+  if (
+    typeof globalThis.crypto !== "undefined" &&
+    typeof globalThis.crypto.randomUUID === "function"
+  ) {
+    return globalThis.crypto.randomUUID()
+  }
+
+  return `restub-${Date.now()}-${Math.random().toString(36).slice(2)}`
+}
+
+async function request<T>(
+  path: string,
+  init: RequestInit = {},
+  unwrapEnvelope = true,
+): Promise<T> {
   const headers = new Headers(init.headers)
   headers.set("Content-Type", "application/json")
 
@@ -70,6 +96,10 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
         ? body.message
         : `API request failed (${response.status})`
     throw new Error(message)
+  }
+
+  if (unwrapEnvelope && isRecord(body) && "success" in body && "data" in body) {
+    return body.data as T
   }
 
   return body as T
@@ -126,13 +156,15 @@ function normalizeListing(value: unknown): ListingSummary {
 
 export const apiClient = {
   async login(email: string, password: string): Promise<void> {
-    const result = await request<unknown>("/auth/login", {
+    const result = await request<AuthTokenResponse>("/auth/login", {
       method: "POST",
       body: JSON.stringify({ email, password }),
     })
-    const token = extractToken(result)
-    if (!token) throw new Error("Login succeeded without an access token")
-    window.localStorage.setItem("restub_access_token", token)
+    if (!result.accessToken || !result.refreshToken) {
+      throw new Error("Login succeeded without complete token credentials")
+    }
+    window.localStorage.setItem("restub_access_token", result.accessToken)
+    window.localStorage.setItem("restub_refresh_token", result.refreshToken)
   },
 
   async register(email: string, password: string): Promise<void> {
@@ -143,17 +175,42 @@ export const apiClient = {
   },
 
   async logout(): Promise<void> {
-    await request("/auth/logout", { method: "POST" })
+    const refreshToken =
+      typeof window === "undefined"
+        ? ""
+        : (window.localStorage.getItem("restub_refresh_token") ?? "")
+    await request("/auth/logout", {
+      method: "POST",
+      body: JSON.stringify({ refreshToken }),
+    })
     window.localStorage.removeItem("restub_access_token")
+    window.localStorage.removeItem("restub_refresh_token")
   },
 
-  async getCurrentUser(): Promise<unknown> {
-    return request("/auth/me")
+  async getCurrentUser(): Promise<AuthUserResponse> {
+    return request<AuthUserResponse>("/auth/me")
   },
 
-  async getListings(): Promise<ListingSummary[]> {
-    const result = await request<unknown>("/listings")
-    return asArray(result).map(normalizeListing)
+  async getListings(
+    options: { limit?: number; cursor?: string } = {},
+  ): Promise<ListingPageResponse> {
+    const query = new URLSearchParams()
+    query.set("limit", String(options.limit ?? 24))
+    if (options.cursor) query.set("cursor", options.cursor)
+    const result = await request<{
+      data: ListingApiRecord[]
+      meta?: JsonRecord
+    }>(`/listings?${query.toString()}`, {}, false)
+    const response = asRecord(result)
+    const pagination = asRecord(response.meta).pagination
+    const page = asRecord(pagination)
+    return {
+      items: asArray(result.data).map(
+        (item) => asRecord(item) as ListingApiRecord,
+      ),
+      nextCursor: typeof page.nextCursor === "string" ? page.nextCursor : null,
+      hasMore: page.hasMore === true,
+    }
   },
 
   async getMyListings(): Promise<ListingSummary[]> {
@@ -161,16 +218,41 @@ export const apiClient = {
     return asArray(result).map(normalizeListing)
   },
 
-  async getListingById(listingId: string): Promise<ListingSummary> {
-    const result = await request<unknown>(
+  async getListingById(listingId: string): Promise<ListingApiRecord> {
+    return request<ListingApiRecord>(
       `/listings/${encodeURIComponent(listingId)}`,
     )
-    return normalizeListing(result)
   },
 
-  async createListing(payload: CreateListingRequest): Promise<ListingSummary> {
+  async submitKyc(
+    payload: SubmitKycRequest,
+    idempotencyKey = createIdempotencyKey(),
+  ): Promise<KycApiRecord> {
+    return request<KycApiRecord>("/kyc/submit", {
+      method: "POST",
+      headers: { "Idempotency-Key": idempotencyKey },
+      body: JSON.stringify(payload),
+    })
+  },
+
+  async createPayoutAccount(
+    payload: CreatePayoutAccountRequest,
+    idempotencyKey = createIdempotencyKey(),
+  ): Promise<PayoutAccountApiRecord> {
+    return request<PayoutAccountApiRecord>("/payout-accounts", {
+      method: "POST",
+      headers: { "Idempotency-Key": idempotencyKey },
+      body: JSON.stringify(payload),
+    })
+  },
+
+  async createListing(
+    payload: CreateListingRequest,
+    idempotencyKey = createIdempotencyKey(),
+  ): Promise<ListingSummary> {
     const result = await request<unknown>("/listings", {
       method: "POST",
+      headers: { "Idempotency-Key": idempotencyKey },
       body: JSON.stringify({
         title: payload.title,
         description: payload.description,
@@ -181,19 +263,16 @@ export const apiClient = {
     return normalizeListing(result)
   },
 
-  async publishListing(listingId: string): Promise<ListingSummary> {
-    const idempotencyKey =
-      typeof globalThis.crypto !== "undefined" &&
-      "randomUUID" in globalThis.crypto
-        ? globalThis.crypto.randomUUID()
-        : `listing-publish-${Date.now()}`
-
+  async publishListing(
+    listingId: string,
+    idempotencyKey = createIdempotencyKey(),
+  ): Promise<ListingSummary> {
     const result = await request<unknown>(
       `/listings/${encodeURIComponent(listingId)}/publish`,
       {
         method: "POST",
         headers: {
-          "idempotency-key": idempotencyKey,
+          "Idempotency-Key": idempotencyKey,
         },
       },
     )
@@ -257,9 +336,13 @@ export const apiClient = {
     })
   },
 
-  async submitCheckout(payload: CheckoutRequest): Promise<CheckoutResponse> {
+  async submitCheckout(
+    payload: CheckoutRequest,
+    idempotencyKey = createIdempotencyKey(),
+  ): Promise<CheckoutResponse> {
     return request<CheckoutResponse>("/orders/checkout", {
       method: "POST",
+      headers: { "Idempotency-Key": idempotencyKey },
       body: JSON.stringify({
         listingId: String(payload.eventId),
         quantity: payload.qty,
@@ -267,32 +350,46 @@ export const apiClient = {
           typeof window === "undefined"
             ? ""
             : (window.localStorage.getItem("restub_email") ?? ""),
+        currency: payload.currency ?? "USD",
       }),
     })
   },
 
   async getKycProfile(): Promise<KycProfile> {
-    const profile = asRecord(await request<unknown>("/kyc/me"))
+    const response = asRecord(await request<unknown>("/kyc/me"))
+    const profile = asRecord(response.data ?? response)
+
     return {
       status: asString(profile.status, "pending") as KycProfile["status"],
-      legalName: asString(profile.legalName ?? profile.name),
+      legalName: asString(profile.legalName ?? profile.name) || null,
       submittedAt:
-        typeof profile.submittedAt === "string" ? profile.submittedAt : null,
-      documentType: (asString(profile.documentType) ||
-        null) as KycProfile["documentType"],
+        asString(
+          profile.submittedAt ?? profile.createdAt ?? profile.updatedAt,
+        ) || null,
+      documentType: asString(profile.documentType) || null,
     }
   },
 
   async getPayoutAccounts(): Promise<PayoutAccount[]> {
-    const result = await request<unknown>("/payout-accounts/me")
-    return asArray(result).map((item) => {
+    const response = asRecord(await request<unknown>("/payout-accounts/me"))
+    const rawAccounts = Array.isArray(response.data)
+      ? response.data
+      : [response.data ?? response]
+
+    return rawAccounts.map((item) => {
       const account = asRecord(item)
+      const status = asString(account.status, "pending")
+
       return {
         id: asString(account.id),
-        institution: asString(account.institution ?? account.bankName),
-        accountName: asString(account.accountName ?? account.name),
-        last4: asString(account.last4),
-        status: asString(account.status, "Pending") as PayoutAccount["status"],
+        institution: asString(
+          account.institution ?? account.bankCode ?? "Bank",
+        ),
+        accountName: asString(
+          account.accountName ?? account.name ?? "Bank account",
+        ),
+        last4: asString(account.accountNumberLast4 ?? account.last4),
+        status: status as PayoutAccount["status"],
       }
     })
   },
@@ -381,11 +478,17 @@ export async function getMyListings() {
 export async function getListingById(listingId: string) {
   return apiClient.getListingById(listingId)
 }
-export async function createListing(payload: CreateListingRequest) {
-  return apiClient.createListing(payload)
+export async function createListing(
+  payload: CreateListingRequest,
+  idempotencyKey?: string,
+) {
+  return apiClient.createListing(payload, idempotencyKey)
 }
-export async function publishListing(listingId: string) {
-  return apiClient.publishListing(listingId)
+export async function publishListing(
+  listingId: string,
+  idempotencyKey?: string,
+) {
+  return apiClient.publishListing(listingId, idempotencyKey)
 }
 export async function getAccountSummary() {
   return apiClient.getAccountSummary()
@@ -399,6 +502,9 @@ export async function getDisputes() {
 export async function getKycCases() {
   return apiClient.getKycCases()
 }
-export async function submitCheckout(payload: CheckoutRequest) {
-  return apiClient.submitCheckout(payload)
+export async function submitCheckout(
+  payload: CheckoutRequest,
+  idempotencyKey?: string,
+) {
+  return apiClient.submitCheckout(payload, idempotencyKey)
 }

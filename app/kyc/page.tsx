@@ -7,9 +7,42 @@ import type { KycProfile } from "../lib/api-types"
 
 export default function KycPage() {
   const [profile, setProfile] = useState<KycProfile | null>(null)
+  const [identifier, setIdentifier] = useState("")
+  const [consent, setConsent] = useState(false)
+  const [consentReference, setConsentReference] = useState("")
+  const [evidenceReference, setEvidenceReference] = useState("")
+  const [externalReference, setExternalReference] = useState("")
+  const [submitting, setSubmitting] = useState(false)
+  const [message, setMessage] = useState("")
+  const [error, setError] = useState("")
   useEffect(() => {
     void apiClient.getKycProfile().then(setProfile)
   }, [])
+
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault()
+    setSubmitting(true)
+    setMessage("")
+    setError("")
+    try {
+      await apiClient.submitKyc({
+        identifier,
+        consent,
+        consent_reference: consentReference,
+        evidence_reference: evidenceReference,
+        external_reference: externalReference,
+      })
+      setMessage("Your KYC submission has been received.")
+      const updated = await apiClient.getKycProfile()
+      setProfile(updated)
+    } catch (reason) {
+      setError(
+        reason instanceof Error ? reason.message : "Unable to submit KYC.",
+      )
+    } finally {
+      setSubmitting(false)
+    }
+  }
 
   return (
     <AccountPageShell eyebrow="Account verification" title="KYC verification">
@@ -63,12 +96,66 @@ export default function KycPage() {
             </p>
           </div>
         </div>
-        <button
-          className="mt-6 px-5 py-3 rounded-lg text-[13px] font-semibold"
-          style={{ backgroundColor: "#111111", color: "#FAFAF7" }}
-        >
-          Start verification
-        </button>
+        <form onSubmit={submit} className="mt-6 space-y-4">
+          <input
+            required
+            value={identifier}
+            onChange={(e) => setIdentifier(e.target.value)}
+            placeholder="Identity number"
+            className="w-full border rounded-lg px-4 py-2.5 text-[13px]"
+          />
+          <input
+            required
+            value={consentReference}
+            onChange={(e) => setConsentReference(e.target.value)}
+            placeholder="Consent reference"
+            className="w-full border rounded-lg px-4 py-2.5 text-[13px]"
+          />
+          <input
+            required
+            value={evidenceReference}
+            onChange={(e) => setEvidenceReference(e.target.value)}
+            placeholder="Evidence reference"
+            className="w-full border rounded-lg px-4 py-2.5 text-[13px]"
+          />
+          <input
+            required
+            value={externalReference}
+            onChange={(e) => setExternalReference(e.target.value)}
+            placeholder="External reference"
+            className="w-full border rounded-lg px-4 py-2.5 text-[13px]"
+          />
+          <label
+            className="flex items-start gap-2 text-[13px]"
+            style={{ color: "#292B2F" }}
+          >
+            <input
+              type="checkbox"
+              checked={consent}
+              onChange={(e) => setConsent(e.target.checked)}
+              required
+            />
+            I consent to identity verification.
+          </label>
+          {message && (
+            <p className="text-[13px]" style={{ color: "#166534" }}>
+              {message}
+            </p>
+          )}
+          {error && (
+            <p className="text-[13px]" style={{ color: "#991B1B" }}>
+              {error}
+            </p>
+          )}
+          <button
+            type="submit"
+            disabled={submitting}
+            className="px-5 py-3 rounded-lg text-[13px] font-semibold disabled:opacity-60"
+            style={{ backgroundColor: "#111111", color: "#FAFAF7" }}
+          >
+            {submitting ? "Submitting…" : "Submit verification"}
+          </button>
+        </form>
       </ResourceCard>
     </AccountPageShell>
   )

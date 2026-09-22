@@ -1,5 +1,5 @@
 import type { ReactNode } from "react"
-import Header from "./Header"
+import AccountSidebar from "./AccountSidebar"
 import { ProtectedRoute } from "./ProtectedRoute"
 
 export default function AccountPageShell({
@@ -14,8 +14,8 @@ export default function AccountPageShell({
   return (
     <ProtectedRoute>
       <div className="min-h-screen" style={{ backgroundColor: "#FAFAF7" }}>
-        <Header />
-        <main className="max-w-5xl mx-auto px-6 py-8">
+        <AccountSidebar />
+        <main className="lg:ml-64 max-w-5xl mx-auto px-6 py-8">
           <div className="mb-6">
             <p
               className="text-[11px] font-medium tracking-widest uppercase mb-2"

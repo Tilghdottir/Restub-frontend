@@ -23,7 +23,7 @@ export default function LoginPage() {
     try {
       await apiClient.login(email, password)
       window.localStorage.setItem("restub_email", email)
-      router.push("/")
+      router.push("/account")
     } catch (error) {
       setError(error instanceof Error ? error.message : "Unable to sign in.")
     } finally {

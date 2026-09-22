@@ -4,6 +4,26 @@ export type DisputeStatus = "Open" | "In Review" | "Resolved"
 export type KycStatus = "pending" | "verified" | "rejected" | "requires_review"
 export type PaymentStatus = "pending" | "authorized" | "captured" | "failed" | "refunded" | "settled"
 export type TicketStatus = "issued" | "redeemed" | "cancelled" | "expired"
+export type PayoutAccountStatus = "pending" | "verified" | "failed" | "suspended"
+
+export type AuthTokenResponse = {
+  accessToken: string
+  refreshToken: string
+}
+
+export type AuthUserResponse = {
+  sub: string
+  email: string
+  firstName?: string
+  lastName?: string
+  phoneNumber?: string
+  eventAlerts?: boolean
+  exclusivePresaleOffers?: boolean
+  customerType: string
+  tokenVersion?: number
+  staffRoles?: string[]
+  items?: unknown[]
+}
 
 export type OrderSummary = {
   id: string
@@ -70,6 +90,7 @@ export type CheckoutRequest = {
   seats: string
   qty: number
   price: number
+  currency?: string
 }
 
 export type CreateListingRequest = {
@@ -92,6 +113,12 @@ export type ListingApiRecord = {
   createdAt: string
   updatedAt: string
   deleted: boolean
+}
+
+export type ListingPageResponse = {
+  items: ListingApiRecord[]
+  nextCursor: string | null
+  hasMore: boolean
 }
 
 export type OrderApiRecord = {
@@ -143,9 +170,29 @@ export type CheckoutResponse = {
 
 export type KycProfile = {
   status: KycStatus
-  legalName: string
+  legalName: string | null
   submittedAt: string | null
-  documentType: "Passport" | "Drivers license" | null
+  documentType: string | null
+}
+
+export type SubmitKycRequest = {
+  identifier: string
+  consent: boolean
+  consent_reference: string
+  evidence_reference: string
+  external_reference: string
+}
+
+export type KycApiRecord = {
+  id: string
+  userId: string
+  providerReference: string | null
+  identityId: string | null
+  partyId: string | null
+  status: KycStatus
+  reason: string | null
+  createdAt: string
+  updatedAt: string
 }
 
 export type PayoutAccount = {
@@ -153,7 +200,27 @@ export type PayoutAccount = {
   institution: string
   accountName: string
   last4: string
-  status: "Verified" | "Pending"
+  status: PayoutAccountStatus
+}
+
+export type CreatePayoutAccountRequest = {
+  bankCode: string
+  accountNumber: string
+  accountName: string
+}
+
+export type PayoutAccountApiRecord = {
+  id: string
+  userId: string
+  providerReference: string | null
+  partyId: string | null
+  bankCode: string
+  accountNumberLast4: string
+  accountName: string
+  status: PayoutAccountStatus
+  reason: string | null
+  createdAt: string
+  updatedAt: string
 }
 
 export type TicketSummary = {

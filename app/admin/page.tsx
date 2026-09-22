@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import Header from "../components/Header"
+import AccountSidebar from "../components/AccountSidebar"
 import { ProtectedRoute } from "../components/ProtectedRoute"
 
 const stats = [
@@ -15,9 +15,9 @@ export default function AdminPage() {
   return (
     <ProtectedRoute>
       <div className="min-h-screen" style={{ backgroundColor: "#FAFAF7" }}>
-        <Header />
+        <AccountSidebar />
 
-        <main className="max-w-6xl mx-auto px-6 py-8">
+        <main className="lg:ml-64 max-w-6xl mx-auto px-6 py-8">
           <div className="mb-6">
             <p
               className="text-[11px] font-medium tracking-widest uppercase mb-2"

@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { useEffect, useState } from "react"
-import Header from "../../../components/Header"
+import AccountSidebar from "../../../components/AccountSidebar"
 import { apiClient } from "../../../lib/api"
 import type { OrderDetailResponse } from "../../../lib/api-types"
 
@@ -20,7 +20,7 @@ export default function PurchaseDetailContent({
   if (!order) {
     return (
       <div className="min-h-screen" style={{ backgroundColor: "#FAFAF7" }}>
-        <Header />
+        <AccountSidebar />
         <div className="max-w-4xl mx-auto px-6 py-16 text-center">
           <p className="text-[14px]" style={{ color: "#292B2F" }}>
             Loading order details…
@@ -32,9 +32,9 @@ export default function PurchaseDetailContent({
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: "#FAFAF7" }}>
-      <Header />
+      <AccountSidebar />
 
-      <main className="max-w-4xl mx-auto px-6 py-8">
+      <main className="lg:ml-64 max-w-4xl mx-auto px-6 py-8">
         <div className="mb-6">
           <Link
             href="/account"

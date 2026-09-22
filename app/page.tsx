@@ -27,17 +27,29 @@ function listingToEvent(listing: ListingSummary): Event {
   }
 }
 
+function listingToSummary(listing: {
+  id: string
+  title: string
+  createdAt: string
+  price: number
+  quantity: number
+  status: ListingSummary["status"]
+}): ListingSummary {
+  return {
+    id: listing.id,
+    eventTitle: listing.title,
+    date: listing.createdAt,
+    askingPrice: listing.price,
+    quantity: listing.quantity,
+    status: listing.status,
+    venue: "Online marketplace",
+  }
+}
+
 function EventCard({ event }: { event: Event }) {
   return (
     <Link
-      href={`/checkout?${new URLSearchParams({
-        eventId: String(event.id),
-        section: "General admission",
-        row: "-",
-        seats: "Assigned at delivery",
-        qty: "1",
-        price: String(event.minPrice),
-      }).toString()}`}
+      href={`/listings?id=${encodeURIComponent(String(event.id))}`}
       className="group text-left bg-white border rounded-lg overflow-hidden block transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-offset-2"
       style={{ borderColor: "#E8E9EB", outlineColor: "#111111" }}
     >
@@ -122,15 +134,21 @@ export default function BrowsePage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [listings, setListings] = useState<ListingSummary[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
+  const [nextCursor, setNextCursor] = useState<string | null>(null)
+  const [hasMore, setHasMore] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
   useEffect(() => {
     let active = true
 
     apiClient
-      .getListings()
+      .getListings({ limit: 24 })
       .then((result) => {
-        if (active) setListings(result)
+        if (!active) return
+        setListings(result.items.map(listingToSummary))
+        setNextCursor(result.nextCursor)
+        setHasMore(result.hasMore)
       })
       .catch((error: unknown) => {
         if (!active) return
@@ -146,6 +164,32 @@ export default function BrowsePage() {
       active = false
     }
   }, [])
+
+  const loadMore = async () => {
+    if (!nextCursor || isLoadingMore) return
+    setIsLoadingMore(true)
+    setErrorMessage(null)
+    try {
+      const result = await apiClient.getListings({
+        limit: 24,
+        cursor: nextCursor,
+      })
+      setListings((current) => [
+        ...current,
+        ...result.items.map(listingToSummary),
+      ])
+      setNextCursor(result.nextCursor)
+      setHasMore(result.hasMore)
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Unable to load more listings.",
+      )
+    } finally {
+      setIsLoadingMore(false)
+    }
+  }
 
   const events = useMemo(() => listings.map(listingToEvent), [listings])
   const filtered = events.filter((e) => {
@@ -320,11 +364,30 @@ export default function BrowsePage() {
             </p>
           </div>
         ) : filtered.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {filtered.map((event) => (
-              <EventCard key={event.id} event={event} />
-            ))}
-          </div>
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {filtered.map((event) => (
+                <EventCard key={event.id} event={event} />
+              ))}
+            </div>
+            {hasMore && (
+              <div className="mt-8 text-center">
+                <button
+                  type="button"
+                  onClick={loadMore}
+                  disabled={isLoadingMore}
+                  className="rounded-lg border px-5 py-3 text-[13px] font-semibold disabled:opacity-60"
+                  style={{
+                    borderColor: "#E8E9EB",
+                    color: "#111111",
+                    backgroundColor: "#FFFFFF",
+                  }}
+                >
+                  {isLoadingMore ? "Loading…" : "Load more listings"}
+                </button>
+              </div>
+            )}
+          </>
         ) : (
           <div
             className="text-center py-20 border rounded-lg bg-white"

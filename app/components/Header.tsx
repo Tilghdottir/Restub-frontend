@@ -1,9 +1,25 @@
 "use client"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { useState } from "react"
+import { apiClient } from "../lib/api"
+import { useAuth } from "../hooks/useAuth"
 
 export default function Header() {
   const [menuOpen, setMenuOpen] = useState(false)
+  const router = useRouter()
+  const { isAuthenticated } = useAuth()
+
+  const handleSignOut = async () => {
+    try {
+      await apiClient.logout()
+    } finally {
+      window.localStorage.removeItem("restub_email")
+      setMenuOpen(false)
+      router.push("/")
+      router.refresh()
+    }
+  }
 
   return (
     <header
@@ -36,20 +52,42 @@ export default function Header() {
           >
             Sell Tickets
           </Link>
-          <Link
-            href="/login"
-            className="text-sm font-medium transition-colors hover:opacity-70"
-            style={{ color: "#292B2F" }}
-          >
-            Sign In
-          </Link>
-          <Link
-            href="/register"
-            className="text-xs font-semibold px-4 py-2 rounded-lg transition-colors"
-            style={{ backgroundColor: "#111111", color: "#FAFAF7" }}
-          >
-            Register
-          </Link>
+          {isAuthenticated ? (
+            <>
+              <Link
+                href="/account"
+                className="text-sm font-medium transition-colors hover:opacity-70"
+                style={{ color: "#292B2F" }}
+              >
+                My Account
+              </Link>
+              <button
+                type="button"
+                onClick={handleSignOut}
+                className="text-sm font-medium transition-colors hover:opacity-70"
+                style={{ color: "#292B2F" }}
+              >
+                Sign Out
+              </button>
+            </>
+          ) : (
+            <>
+              <Link
+                href="/login"
+                className="text-sm font-medium transition-colors hover:opacity-70"
+                style={{ color: "#292B2F" }}
+              >
+                Sign In
+              </Link>
+              <Link
+                href="/register"
+                className="text-xs font-semibold px-4 py-2 rounded-lg transition-colors"
+                style={{ backgroundColor: "#111111", color: "#FAFAF7" }}
+              >
+                Register
+              </Link>
+            </>
+          )}
         </nav>
         <button
           className="md:hidden ml-auto p-2"
@@ -78,20 +116,43 @@ export default function Header() {
           >
             Browse
           </Link>
-          <Link
-            href="/login"
-            className="text-sm font-medium py-1"
-            style={{ color: "#292B2F" }}
-          >
-            Sign In
-          </Link>
-          <Link
-            href="/register"
-            className="text-sm font-semibold py-1"
-            style={{ color: "#111111" }}
-          >
-            Register
-          </Link>
+          {isAuthenticated ? (
+            <>
+              <Link
+                href="/account"
+                className="text-sm font-medium py-1"
+                style={{ color: "#292B2F" }}
+                onClick={() => setMenuOpen(false)}
+              >
+                My Account
+              </Link>
+              <button
+                type="button"
+                onClick={handleSignOut}
+                className="text-left text-sm font-semibold py-1"
+                style={{ color: "#111111" }}
+              >
+                Sign Out
+              </button>
+            </>
+          ) : (
+            <>
+              <Link
+                href="/login"
+                className="text-sm font-medium py-1"
+                style={{ color: "#292B2F" }}
+              >
+                Sign In
+              </Link>
+              <Link
+                href="/register"
+                className="text-sm font-semibold py-1"
+                style={{ color: "#111111" }}
+              >
+                Register
+              </Link>
+            </>
+          )}
         </div>
       )}
     </header>
