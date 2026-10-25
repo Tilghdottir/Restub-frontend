@@ -1,18 +1,16 @@
 "use client"
 
-import { useEffect, useState } from "react"
 import AccountPageShell, { ResourceCard } from "../components/AccountPageShell"
-import { apiClient } from "../lib/api"
-import type { TransactionSummary } from "../lib/api-types"
+import ApiErrorNotice from "../components/ApiErrorNotice"
+import { useGetPaymentsQuery } from "../lib/account-data/rtk"
 
 export default function TransactionPage() {
-  const [transactions, setTransactions] = useState<TransactionSummary[]>([])
-  useEffect(() => {
-    void apiClient.getTransactions().then(setTransactions)
-  }, [])
+  const { data, error } = useGetPaymentsQuery()
+  const transactions = data?.transactions ?? []
 
   return (
     <AccountPageShell eyebrow="Account activity" title="Transactions">
+      <ApiErrorNotice error={error} fallback="Unable to load transactions." />
       <ResourceCard>
         <div className="divide-y" style={{ borderColor: "#E8E9EB" }}>
           {transactions.map((transaction) => (

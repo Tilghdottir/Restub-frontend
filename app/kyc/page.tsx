@@ -1,51 +1,73 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import AccountPageShell, { ResourceCard } from "../components/AccountPageShell"
-import { apiClient } from "../lib/api"
-import type { KycProfile } from "../lib/api-types"
+import ApiErrorNotice from "../components/ApiErrorNotice"
+import type { SubmitKycRequest } from "../lib/kyc/types"
+import { getApiErrorMessage } from "../lib/rtk-api"
+import {
+  useGetKycProfileQuery,
+  useSubmitKycMutation,
+} from "../lib/kyc/rtk"
 
 export default function KycPage() {
-  const [profile, setProfile] = useState<KycProfile | null>(null)
+  const { data: profile, error: profileError } = useGetKycProfileQuery()
+  const [submitKyc, { isLoading: submitting }] = useSubmitKycMutation()
+  const [type, setType] = useState<NonNullable<SubmitKycRequest["type"]>>("bvn")
   const [identifier, setIdentifier] = useState("")
+  const [dateOfBirth, setDateOfBirth] = useState("")
   const [consent, setConsent] = useState(false)
   const [consentReference, setConsentReference] = useState("")
   const [evidenceReference, setEvidenceReference] = useState("")
   const [externalReference, setExternalReference] = useState("")
-  const [submitting, setSubmitting] = useState(false)
   const [message, setMessage] = useState("")
   const [error, setError] = useState("")
-  useEffect(() => {
-    void apiClient.getKycProfile().then(setProfile)
-  }, [])
+  const [open, setOpen] = useState(false)
+
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault()
-    setSubmitting(true)
+    const parsedDate = new Date(`${dateOfBirth}T00:00:00.000Z`)
+    if (
+      !/^\d{4}-\d{2}-\d{2}$/.test(dateOfBirth) ||
+      Number.isNaN(parsedDate.getTime()) ||
+      parsedDate.toISOString().slice(0, 10) !== dateOfBirth
+    ) {
+      setError("Enter a valid date of birth.")
+      return
+    }
     setMessage("")
     setError("")
     try {
-      await apiClient.submitKyc({
-        identifier,
-        consent,
-        consent_reference: consentReference,
-        evidence_reference: evidenceReference,
-        external_reference: externalReference,
-      })
+      await submitKyc({
+        payload: {
+          type,
+          identifier,
+          date_of_birth: dateOfBirth,
+          consent,
+          ...(consentReference.trim()
+            ? { consent_reference: consentReference.trim() }
+            : {}),
+          ...(evidenceReference.trim()
+            ? { evidence_reference: evidenceReference.trim() }
+            : {}),
+          ...(externalReference.trim()
+            ? { external_reference: externalReference.trim() }
+            : {}),
+        },
+      }).unwrap()
       setMessage("Your KYC submission has been received.")
-      const updated = await apiClient.getKycProfile()
-      setProfile(updated)
     } catch (reason) {
-      setError(
-        reason instanceof Error ? reason.message : "Unable to submit KYC.",
-      )
-    } finally {
-      setSubmitting(false)
+      setError(getApiErrorMessage(reason, "Unable to submit KYC."))
     }
   }
 
   return (
     <AccountPageShell eyebrow="Account verification" title="KYC verification">
+      <ApiErrorNotice
+        error={profileError}
+        fallback="Unable to load KYC status."
+      />
       <ResourceCard>
         <div className="flex items-start justify-between gap-4">
           <div>
@@ -96,35 +118,78 @@ export default function KycPage() {
             </p>
           </div>
         </div>
-        <form onSubmit={submit} className="mt-6 space-y-4">
-          <input
-            required
-            value={identifier}
-            onChange={(e) => setIdentifier(e.target.value)}
-            placeholder="Identity number"
-            className="w-full border rounded-lg px-4 py-2.5 text-[13px]"
-          />
-          <input
-            required
-            value={consentReference}
-            onChange={(e) => setConsentReference(e.target.value)}
-            placeholder="Consent reference"
-            className="w-full border rounded-lg px-4 py-2.5 text-[13px]"
-          />
-          <input
-            required
-            value={evidenceReference}
-            onChange={(e) => setEvidenceReference(e.target.value)}
-            placeholder="Evidence reference"
-            className="w-full border rounded-lg px-4 py-2.5 text-[13px]"
-          />
-          <input
-            required
-            value={externalReference}
-            onChange={(e) => setExternalReference(e.target.value)}
-            placeholder="External reference"
-            className="w-full border rounded-lg px-4 py-2.5 text-[13px]"
-          />
+
+      </ResourceCard>
+      <button
+        type="button"
+        onClick={() => {
+          setError("")
+          setOpen(true)
+        }}
+        className="w-full md:w-auto px-5 py-3 rounded-lg text-[13px] font-semibold"
+        style={{ backgroundColor: "#111111", color: "#FAFAF7" }}
+      >
+        Add KYC
+      </button>
+      {open && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setOpen(false)
+          }}
+        >
+          <form
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="kyc-dialog-title"
+            className="w-full max-w-md bg-white border rounded-lg p-5 space-y-4 shadow-xl"
+            style={{ borderColor: "#E8E9EB" }}
+            onSubmit={submit}>
+            <select
+              value={type}
+              onChange={(event) => {
+                const value = event.target.value
+                if (
+                  value === "bvn" ||
+                  value === "nin" ||
+                  value === "passport" ||
+                  value === "driver_license" ||
+                  value === "national_id"
+                ) {
+                  setType(value)
+                }
+              }}
+              className="w-full border rounded-lg px-4 py-2.5 text-[13px]"
+            >
+              <option value="bvn">Bank Verification Number (BVN)</option>
+              <option value="nin">National Identity Number (NIN)</option>
+              <option value="passport">Passport</option>
+              <option value="driver_license">Driver's license</option>
+              <option value="national_id">National ID</option>
+            </select>
+            <label className="block text-[13px]" style={{ color: "#292B2F" }}>
+              Date of birth
+              <input
+                required
+                type="date"
+                autoComplete="bday"
+                value={dateOfBirth}
+                onChange={(event) => setDateOfBirth(event.target.value)}
+                className="mt-1 w-full border rounded-lg px-4 py-2.5 text-[13px]"
+              />
+              <span className="mt-1 block text-[11px]">
+                Use the date registered to your identity record.
+              </span>
+            </label>
+            <input
+              required
+              inputMode="numeric"
+              value={identifier}
+              onChange={(e) => setIdentifier(e.target.value)}
+              placeholder="Identity number"
+              className="w-full border rounded-lg px-4 py-2.5 text-[13px]"
+            />
           <label
             className="flex items-start gap-2 text-[13px]"
             style={{ color: "#292B2F" }}
@@ -156,7 +221,9 @@ export default function KycPage() {
             {submitting ? "Submitting…" : "Submit verification"}
           </button>
         </form>
-      </ResourceCard>
+        </div>
+      )}
+      {message && <p className="text-[13px] text-green-800">{message}</p>}
     </AccountPageShell>
   )
 }

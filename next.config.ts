@@ -5,12 +5,13 @@ export default function nextConfig(phase: string): NextConfig {
   const isDevelopment = phase === PHASE_DEVELOPMENT_SERVER
 
   return {
-    output: "export",
+    // output: "export",
     distDir: "dist",
     basePath: isDevelopment ? "" : "/Restub-frontend",
     trailingSlash: true,
     images: {
       unoptimized: true,
     },
+    allowedDevOrigins: isDevelopment ? ["http://localhost:3000", "http://localhost:3001", "https://pastime-earthlike-overeater.ngrok-free.dev"] : [],
   }
 }

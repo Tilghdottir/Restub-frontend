@@ -37,15 +37,7 @@ export default function EventDetail({ id }: { id: string }) {
   const total = subtotal + fees
 
   const handleCheckout = () => {
-    const p = new URLSearchParams({
-      eventId: String(event.id),
-      section: section.label,
-      row: section.row,
-      seats: section.seats,
-      qty: String(qty),
-      price: String(section.price),
-    })
-    router.push(`/checkout?${p.toString()}`)
+    router.push(`/checkout/${encodeURIComponent(String(event.id))}?qty=${qty}`)
   }
 
   return (

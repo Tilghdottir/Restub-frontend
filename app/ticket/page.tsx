@@ -1,18 +1,15 @@
 "use client"
 
-import { useEffect, useState } from "react"
 import AccountPageShell, { ResourceCard } from "../components/AccountPageShell"
-import { apiClient } from "../lib/api"
-import type { TicketSummary } from "../lib/api-types"
+import ApiErrorNotice from "../components/ApiErrorNotice"
+import { useGetTicketsQuery } from "../lib/account-data/rtk"
 
 export default function TicketPage() {
-  const [tickets, setTickets] = useState<TicketSummary[]>([])
-  useEffect(() => {
-    void apiClient.getTickets().then(setTickets)
-  }, [])
+  const { data: tickets = [], error } = useGetTicketsQuery()
 
   return (
     <AccountPageShell eyebrow="Digital tickets" title="My tickets">
+      <ApiErrorNotice error={error} fallback="Unable to load your tickets." />
       <div className="space-y-4">
         {tickets.map((ticket) => (
           <ResourceCard key={ticket.id}>

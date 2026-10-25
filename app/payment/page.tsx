@@ -1,18 +1,19 @@
 "use client"
 
-import { useEffect, useState } from "react"
 import AccountPageShell, { ResourceCard } from "../components/AccountPageShell"
-import { apiClient } from "../lib/api"
-import type { PaymentMethod } from "../lib/api-types"
+import ApiErrorNotice from "../components/ApiErrorNotice"
+import { useGetPaymentsQuery } from "../lib/account-data/rtk"
 
 export default function PaymentPage() {
-  const [methods, setMethods] = useState<PaymentMethod[]>([])
-  useEffect(() => {
-    void apiClient.getPaymentMethods().then(setMethods)
-  }, [])
+  const { data, error } = useGetPaymentsQuery()
+  const methods = data?.methods ?? []
 
   return (
     <AccountPageShell eyebrow="Billing" title="Payment methods">
+      <ApiErrorNotice
+        error={error}
+        fallback="Unable to load your payment methods."
+      />
       <div className="space-y-4">
         {methods.map((method) => (
           <ResourceCard key={method.id}>

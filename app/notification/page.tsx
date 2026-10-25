@@ -1,18 +1,18 @@
 "use client"
 
-import { useEffect, useState } from "react"
 import AccountPageShell, { ResourceCard } from "../components/AccountPageShell"
-import { apiClient } from "../lib/api"
-import type { NotificationSummary } from "../lib/api-types"
+import ApiErrorNotice from "../components/ApiErrorNotice"
+import { useGetNotificationsQuery } from "../lib/account-data/rtk"
 
 export default function NotificationPage() {
-  const [notifications, setNotifications] = useState<NotificationSummary[]>([])
-  useEffect(() => {
-    void apiClient.getNotifications().then(setNotifications)
-  }, [])
+  const { data: notifications = [], error } = useGetNotificationsQuery()
 
   return (
     <AccountPageShell eyebrow="Updates" title="Notifications">
+      <ApiErrorNotice
+        error={error}
+        fallback="Unable to load your notifications."
+      />
       <div className="space-y-3">
         {notifications.map((notification) => (
           <ResourceCard key={notification.id}>

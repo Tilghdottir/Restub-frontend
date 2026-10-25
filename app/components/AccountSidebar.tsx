@@ -3,6 +3,8 @@
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { useAuth } from "../hooks/useAuth"
+import { useLogoutMutation } from "../lib/auth/rtk"
+import BrandLogo from "./BrandLogo"
 import Header from "./Header"
 
 const accountLinks = [
@@ -20,23 +22,49 @@ const accountLinks = [
 export default function AccountSidebar() {
   const pathname = usePathname()
   const router = useRouter()
-  const { user } = useAuth()
+  const { user, hasPermission } = useAuth()
+  const [logout] = useLogoutMutation()
+  const adminLinks = [
+    {
+      href: "/admin",
+      label: "Overview",
+      permission: "platform:read",
+    },
+    {
+      href: "/admin/tickets",
+      label: "Ticket verification",
+      permission: "tickets:review",
+    },
+    {
+      href: "/admin/events",
+      label: "Event catalog",
+      permission: "events:manage",
+    },
+    {
+      href: "/admin/disputes",
+      label: "Disputes",
+      permission: "disputes:resolve",
+    },
+    {
+      href: "/admin/kyc",
+      label: "KYC reviews",
+      permission: "kyc:review",
+    },
+  ] as const
   const links = pathname.startsWith("/admin")
-    ? [
-        { href: "/admin", label: "Overview" },
-        { href: "/admin/disputes", label: "Disputes" },
-        { href: "/admin/kyc", label: "KYC reviews" },
-      ]
+    ? adminLinks.filter((link) => hasPermission(link.permission))
     : accountLinks
 
-  const signOut = () => {
-    void import("../lib/api").then(({ apiClient }) =>
-      apiClient.logout().finally(() => {
-        window.localStorage.removeItem("restub_email")
-        router.push("/")
-        router.refresh()
-      }),
-    )
+  const signOut = async () => {
+    try {
+      await logout().unwrap()
+    } catch (error) {
+      console.error("Sign-out request failed.", error)
+    } finally {
+      window.localStorage.removeItem("restub_email")
+      router.push("/")
+      router.refresh()
+    }
   }
 
   return (
@@ -52,16 +80,7 @@ export default function AccountSidebar() {
           className="px-6 h-14 flex items-center border-b"
           style={{ borderColor: "#E8E9EB" }}
         >
-          <Link
-            href="/"
-            className="text-base font-bold tracking-tight"
-            style={{ color: "#111111" }}
-          >
-            resale
-            <span className="font-normal" style={{ color: "#292B2F" }}>
-              .co
-            </span>
-          </Link>
+          <BrandLogo width={120} height={28} />
         </div>
         <div className="px-4 py-5">
           <p
@@ -100,6 +119,14 @@ export default function AccountSidebar() {
           >
             {user?.email || "Signed-in account"}
           </p>
+          {pathname.startsWith("/admin") && user?.staffRoles.length ? (
+            <p
+              className="mt-1 text-[10px] uppercase tracking-wide"
+              style={{ color: "#292B2F" }}
+            >
+              {user.staffRoles.join(" · ")}
+            </p>
+          ) : null}
           <button
             type="button"
             onClick={signOut}

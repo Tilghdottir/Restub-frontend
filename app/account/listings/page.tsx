@@ -5,11 +5,21 @@ import { useEffect, useState } from "react"
 import AccountPageShell, {
   ResourceCard,
 } from "../../components/AccountPageShell"
-import { apiClient } from "../../lib/api"
-import type { ListingApiRecord } from "../../lib/api-types"
+import { formatNaira } from "../../lib/money"
+import { getApiErrorMessage } from "../../lib/rtk-api"
+import {
+  isTicketPackage,
+  LISTING_TICKET_TYPE_LABELS,
+} from "../../lib/listings/ticket-types"
+import type { ListingDetail } from "../../lib/listings/models"
+import {
+  useLazyGetListingByIdQuery,
+  useLazyGetMyListingByIdQuery,
+} from "../../lib/listings/rtk"
 
 export default function AccountListingDetailsPage() {
-  const [listing, setListing] = useState<ListingApiRecord | null>(null)
+  const [fetchListing] = useLazyGetMyListingByIdQuery()
+  const [listing, setListing] = useState<ListingDetail | null>(null)
   const [error, setError] = useState("")
 
   useEffect(() => {
@@ -19,15 +29,13 @@ export default function AccountListingDetailsPage() {
       return
     }
 
-    void apiClient
-      .getListingById(id)
+    void fetchListing(id)
+      .unwrap()
       .then(setListing)
       .catch((reason: unknown) => {
-        setError(
-          reason instanceof Error ? reason.message : "Unable to load listing.",
-        )
+        setError(getApiErrorMessage(reason, "Unable to load listing."))
       })
-  }, [])
+  }, [fetchListing])
 
   return (
     <AccountPageShell eyebrow="My account" title="Listing details">
@@ -67,21 +75,39 @@ export default function AccountListingDetailsPage() {
           >
             {listing.description}
           </p>
+          <div className="mt-4 rounded-lg bg-[#FAFAF7] p-4">
+            <p className="text-[12px] font-semibold text-[#111111]">
+              {listing.ticketCategory ?? "General Admission"} ·{" "}
+              {
+                LISTING_TICKET_TYPE_LABELS[
+                  listing.ticketType ?? "general_admission"
+                ]
+              }
+            </p>
+            {listing.ticketDetails?.includedAdmissions ? (
+              <p className="mt-1 text-[13px] text-[#292B2F]">
+                {listing.ticketDetails.includedAdmissions} admissions per
+                package
+              </p>
+            ) : null}
+          </div>
           <div
             className="mt-6 grid gap-4 border-t pt-5 sm:grid-cols-2 lg:grid-cols-4"
             style={{ borderColor: "#E8E9EB" }}
           >
             <div>
               <p className="text-[11px] uppercase" style={{ color: "#292B2F" }}>
-                Price
+                {isTicketPackage(listing.ticketType)
+                  ? "Price per package"
+                  : "Price per ticket"}
               </p>
               <p className="mt-1 font-mono-data font-semibold">
-                ${listing.price.toLocaleString()}
+                {formatNaira(listing.price)}
               </p>
             </div>
             <div>
               <p className="text-[11px] uppercase" style={{ color: "#292B2F" }}>
-                Quantity
+                {isTicketPackage(listing.ticketType) ? "Packages" : "Tickets"}
               </p>
               <p className="mt-1 font-semibold">{listing.quantity}</p>
             </div>

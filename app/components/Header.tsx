@@ -2,17 +2,21 @@
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
-import { apiClient } from "../lib/api"
+import BrandLogo from "./BrandLogo"
+import { useLogoutMutation } from "../lib/auth/rtk"
 import { useAuth } from "../hooks/useAuth"
 
 export default function Header() {
   const [menuOpen, setMenuOpen] = useState(false)
   const router = useRouter()
   const { isAuthenticated } = useAuth()
+  const [logout] = useLogoutMutation()
 
   const handleSignOut = async () => {
     try {
-      await apiClient.logout()
+      await logout().unwrap()
+    } catch (error) {
+      console.error("Sign-out request failed.", error)
     } finally {
       window.localStorage.removeItem("restub_email")
       setMenuOpen(false)
@@ -27,16 +31,7 @@ export default function Header() {
       style={{ borderColor: "#E8E9EB" }}
     >
       <div className="max-w-6xl mx-auto px-6 h-14 flex items-center gap-6">
-        <Link
-          href="/"
-          className="text-base font-bold tracking-tight shrink-0"
-          style={{ color: "#111111" }}
-        >
-          resale
-          <span className="font-normal" style={{ color: "#292B2F" }}>
-            .co
-          </span>
-        </Link>
+        <BrandLogo className="" width={120} height={28} />
         <nav className="hidden md:flex items-center gap-5 ml-auto">
           <Link
             href="/"

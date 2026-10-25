@@ -1,18 +1,21 @@
 "use client"
 
-import { useEffect, useState } from "react"
 import AccountPageShell, { ResourceCard } from "../components/AccountPageShell"
-import { apiClient } from "../lib/api"
-import type { RefundSummary } from "../lib/api-types"
+import { getApiErrorMessage } from "../lib/rtk-api"
+import { useGetRefundsQuery } from "../lib/account-data/rtk"
 
 export default function RefundPage() {
-  const [refunds, setRefunds] = useState<RefundSummary[]>([])
-  useEffect(() => {
-    void apiClient.getRefunds().then(setRefunds)
-  }, [])
+  const { data: refunds = [], error } = useGetRefundsQuery()
 
   return (
     <AccountPageShell eyebrow="Order support" title="Refunds">
+      {error && (
+        <ResourceCard>
+          <p className="text-[14px]" style={{ color: "#292B2F" }}>
+            {getApiErrorMessage(error, "Unable to load refunds.")}
+          </p>
+        </ResourceCard>
+      )}
       <div className="space-y-4">
         {refunds.map((refund) => (
           <ResourceCard key={refund.id}>

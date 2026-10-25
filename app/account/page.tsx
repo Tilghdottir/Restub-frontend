@@ -1,14 +1,17 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import Link from "next/link"
 import AccountSidebar from "../components/AccountSidebar"
-import { apiClient } from "../lib/api"
-import type {
-  AccountSummaryResponse,
-  ListingSummary,
-  OrderSummary,
-} from "../lib/api-types"
+import ApiErrorNotice from "../components/ApiErrorNotice"
+import { formatNaira } from "../lib/money"
+import type { ListingSummary } from "../lib/listings/models"
+import {
+  isTicketPackage,
+  LISTING_TICKET_TYPE_LABELS,
+} from "../lib/listings/ticket-types"
+import type { OrderSummary } from "../lib/orders/models"
+import { useGetAccountSummaryQuery } from "../lib/account/rtk"
 
 const tabs = ["My Purchases", "My Listings"] as const
 
@@ -16,11 +19,7 @@ type TabKey = typeof tabs[number]
 
 export default function AccountPage() {
   const [activeTab, setActiveTab] = useState<TabKey>("My Purchases")
-  const [data, setData] = useState<AccountSummaryResponse | null>(null)
-
-  useEffect(() => {
-    apiClient.getAccountSummary().then(setData)
-  }, [])
+  const { data, error } = useGetAccountSummaryQuery()
 
   const purchases = data?.purchases ?? []
   const listings = data?.listings ?? []
@@ -30,6 +29,10 @@ export default function AccountPage() {
       <AccountSidebar />
 
       <main className="lg:ml-64 max-w-5xl mx-auto px-6 py-8">
+        <ApiErrorNotice
+          error={error}
+          fallback="Unable to load your account summary."
+        />
         <div className="mb-6">
           <p
             className="text-[11px] font-medium tracking-widest uppercase mb-2"
@@ -150,13 +153,15 @@ export default function AccountPage() {
               </div>
             ) : (
               listings.map((listing: ListingSummary) => (
-                <Link
+                <div
                   key={listing.id}
-                  href={`/account/listings?id=${encodeURIComponent(listing.id)}`}
                   className="bg-white border rounded-lg p-5 flex flex-col gap-4 md:flex-row md:items-center md:justify-between"
                   style={{ borderColor: "#E8E9EB" }}
                 >
-                  <div>
+                  <Link
+                    href={`/account/listings?id=${encodeURIComponent(listing.id)}`}
+                    className="min-w-0"
+                  >
                     <p
                       className="text-[11px] font-medium tracking-wide uppercase"
                       style={{ color: "#292B2F" }}
@@ -175,20 +180,57 @@ export default function AccountPage() {
                     >
                       {listing.date} · {listing.venue}
                     </p>
-                  </div>
-                  <div className="flex items-center gap-4">
+                    <p
+                      className="text-[12px] mt-1"
+                      style={{ color: "#292B2F" }}
+                    >
+                      {listing.ticketCategory ?? "General Admission"} ·{" "}
+                      {
+                        LISTING_TICKET_TYPE_LABELS[
+                          listing.ticketType ?? "general_admission"
+                        ]
+                      }{" "}
+                      · {listing.quantity}{" "}
+                      {isTicketPackage(listing.ticketType)
+                        ? "packages"
+                        : "tickets"}
+                    </p>
+                    {listing.manualReviewStatus &&
+                    listing.manualReviewStatus !== "not_submitted" ? (
+                      <p
+                        className="mt-2 text-[12px] font-medium"
+                        style={{
+                          color:
+                            listing.manualReviewStatus === "rejected"
+                              ? "#A03B32"
+                              : listing.manualReviewStatus === "approved"
+                                ? "#22633D"
+                                : "#6A5318",
+                        }}
+                      >
+                        Ticket review: {listing.manualReviewStatus}
+                        {listing.manualReviewStatus === "rejected" &&
+                        listing.manualReviewNote
+                          ? ` — ${listing.manualReviewNote}`
+                          : ""}
+                      </p>
+                    ) : null}
+                  </Link>
+                  <div className="flex items-center justify-between gap-4 md:justify-end">
                     <div className="text-right">
                       <p
                         className="text-[11px] uppercase tracking-wide"
                         style={{ color: "#292B2F" }}
                       >
-                        Asking
+                        {isTicketPackage(listing.ticketType)
+                          ? "Asking per package"
+                          : "Asking per ticket"}
                       </p>
                       <p
                         className="font-mono-data text-[16px] font-semibold"
                         style={{ color: "#111111" }}
                       >
-                        ${listing.askingPrice.toLocaleString()}
+                        {formatNaira(listing.askingPrice)}
                       </p>
                     </div>
                     <span
@@ -197,8 +239,16 @@ export default function AccountPage() {
                     >
                       {listing.status}
                     </span>
+                    {listing.status === "draft" ? (
+                      <Link
+                        href={`/sell?listingId=${encodeURIComponent(listing.id)}`}
+                        className="rounded-md bg-[#111111] px-3 py-2 text-[12px] font-semibold text-white"
+                      >
+                        Continue listing
+                      </Link>
+                    ) : null}
                   </div>
-                </Link>
+                </div>
               ))
             )}
           </div>

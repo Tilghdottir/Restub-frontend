@@ -1,10 +1,13 @@
 "use client" /* Search bar */ /* Hero strip */ /* Category pills */ /* Event grid */ /* How it works */ /* Footer */
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
+import BrandLogo from "./components/BrandLogo"
 import Header from "./components/Header"
 import type { Event } from "./lib/data"
-import { apiClient } from "./lib/api"
-import type { ListingSummary } from "./lib/api-types"
+import type { ListingSummary } from "./lib/listings/models"
+import { formatNaira } from "./lib/money"
+import { getApiErrorMessage } from "./lib/rtk-api"
+import { useLazyGetListingsQuery } from "./lib/listings/rtk"
 
 function listingToEvent(listing: ListingSummary): Event {
   return {
@@ -27,29 +30,10 @@ function listingToEvent(listing: ListingSummary): Event {
   }
 }
 
-function listingToSummary(listing: {
-  id: string
-  title: string
-  createdAt: string
-  price: number
-  quantity: number
-  status: ListingSummary["status"]
-}): ListingSummary {
-  return {
-    id: listing.id,
-    eventTitle: listing.title,
-    date: listing.createdAt,
-    askingPrice: listing.price,
-    quantity: listing.quantity,
-    status: listing.status,
-    venue: "Online marketplace",
-  }
-}
-
 function EventCard({ event }: { event: Event }) {
   return (
     <Link
-      href={`/listings?id=${encodeURIComponent(String(event.id))}`}
+      href={`/listings/${encodeURIComponent(String(event.id))}`}
       className="group text-left bg-white border rounded-lg overflow-hidden block transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-offset-2"
       style={{ borderColor: "#E8E9EB", outlineColor: "#111111" }}
     >
@@ -120,7 +104,7 @@ function EventCard({ event }: { event: Event }) {
               className="font-mono-data text-[15px] font-semibold"
               style={{ color: "#111111" }}
             >
-              ${event.minPrice.toLocaleString()}
+              {formatNaira(event.minPrice)}
             </span>
           </div>
         </div>
@@ -133,58 +117,51 @@ export default function BrowsePage() {
   const [activeCategory, setActiveCategory] = useState("All")
   const [searchQuery, setSearchQuery] = useState("")
   const [listings, setListings] = useState<ListingSummary[]>([])
-  const [isLoading, setIsLoading] = useState(true)
   const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [nextCursor, setNextCursor] = useState<string | null>(null)
   const [hasMore, setHasMore] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [fetchListings, { isLoading }] = useLazyGetListingsQuery()
 
   useEffect(() => {
     let active = true
 
-    apiClient
-      .getListings({ limit: 24 })
+    fetchListings({ limit: 24 })
+      .unwrap()
       .then((result) => {
         if (!active) return
-        setListings(result.items.map(listingToSummary))
+        setListings(result.items)
         setNextCursor(result.nextCursor)
         setHasMore(result.hasMore)
       })
       .catch((error: unknown) => {
         if (!active) return
-        setErrorMessage(
-          error instanceof Error ? error.message : "Unable to load listings.",
-        )
-      })
-      .finally(() => {
-        if (active) setIsLoading(false)
+        setErrorMessage(getApiErrorMessage(error, "Unable to load listings."))
       })
 
     return () => {
       active = false
     }
-  }, [])
+  }, [fetchListings])
 
   const loadMore = async () => {
     if (!nextCursor || isLoadingMore) return
     setIsLoadingMore(true)
     setErrorMessage(null)
     try {
-      const result = await apiClient.getListings({
+      const result = await fetchListings({
         limit: 24,
         cursor: nextCursor,
-      })
+      }).unwrap()
       setListings((current) => [
         ...current,
-        ...result.items.map(listingToSummary),
+        ...result.items,
       ])
       setNextCursor(result.nextCursor)
       setHasMore(result.hasMore)
     } catch (error) {
       setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : "Unable to load more listings.",
+        getApiErrorMessage(error, "Unable to load more listings."),
       )
     } finally {
       setIsLoadingMore(false)
@@ -467,12 +444,7 @@ export default function BrowsePage() {
       >
         <div className="max-w-6xl mx-auto px-6 py-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div>
-            <p className="text-[14px] font-bold" style={{ color: "#111111" }}>
-              resale
-              <span className="font-normal" style={{ color: "#292B2F" }}>
-                .co
-              </span>
-            </p>
+            <BrandLogo width={120} height={28} />
             <p className="text-[12px] mt-1" style={{ color: "#292B2F" }}>
               © 2026 Resale Co. All rights reserved.
             </p>

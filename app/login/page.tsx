@@ -1,16 +1,28 @@
 "use client" /* Left panel — branding */ /* Right panel — form */ /* Mobile logo */
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
-import { apiClient } from "../lib/api"
+import { usePathname, useRouter } from "next/navigation"
+import BrandLogo from "../components/BrandLogo"
+import { getApiErrorMessage } from "../lib/rtk-api"
+import { useLoginMutation } from "../lib/auth/rtk"
+import { getCurrentUser } from "../lib/auth/client"
 
 export default function LoginPage() {
   const router = useRouter()
+  const pathname = usePathname()
+  const [login, { isLoading: loading }] = useLoginMutation()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
-  const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
+  const [adminLogin, setAdminLogin] = useState(pathname === "/admin/login")
+
+  useEffect(() => {
+    const nextPath = new URLSearchParams(window.location.search).get("next")
+    setAdminLogin(
+      pathname === "/admin/login" || nextPath?.startsWith("/admin") === true,
+    )
+  }, [pathname])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -19,15 +31,30 @@ export default function LoginPage() {
       setError("Please fill in all fields.")
       return
     }
-    setLoading(true)
     try {
-      await apiClient.login(email, password)
+      await login({ email, password }).unwrap()
+      const profile = await getCurrentUser()
       window.localStorage.setItem("restub_email", email)
-      router.push("/account")
+      if (adminLogin) {
+        if (!profile.permissions.length) {
+          setError(
+            "This account does not have permission to access staff tools.",
+          )
+          return
+        }
+        const nextPath = new URLSearchParams(window.location.search).get("next")
+        router.push(
+          nextPath?.startsWith("/admin/") && nextPath !== "/admin/login"
+            ? nextPath
+            : "/admin",
+        )
+        return
+      }
+      router.push(
+        profile.permissions.includes("platform:read") ? "/admin" : "/account",
+      )
     } catch (error) {
-      setError(error instanceof Error ? error.message : "Unable to sign in.")
-    } finally {
-      setLoading(false)
+      setError(getApiErrorMessage(error, "Unable to sign in."))
     }
   }
 
@@ -38,15 +65,7 @@ export default function LoginPage() {
         className="hidden lg:flex flex-col justify-between w-[420px] shrink-0 p-10"
         style={{ backgroundColor: "#111111", color: "#FAFAF7" }}
       >
-        <Link href="/" className="text-[16px] font-bold tracking-tight">
-          resale
-          <span
-            className="font-normal"
-            style={{ color: "rgba(250,250,247,0.5)" }}
-          >
-            .co
-          </span>
-        </Link>
+        <BrandLogo width={140} height={32} className="" />
         <div>
           <blockquote className="text-[22px] font-medium leading-snug mb-6">
             "Got floor seats to Hamilton for under face value. Absolutely
@@ -70,21 +89,18 @@ export default function LoginPage() {
       {}
       <div className="flex-1 flex flex-col items-center justify-center px-6 py-12">
         {}
-        <Link
-          href="/"
-          className="lg:hidden text-[16px] font-bold tracking-tight mb-8"
-          style={{ color: "#111111" }}
-        >
-          resale
-          <span className="font-normal" style={{ color: "#292B2F" }}>
-            .co
-          </span>
-        </Link>
+        <BrandLogo width={120} height={28} className="lg:hidden mb-8" />
 
         <div className="w-full max-w-sm">
           <h1 className="text-2xl font-bold mb-1" style={{ color: "#111111" }}>
-            Sign in
+            {adminLogin ? "Staff sign in" : "Sign in"}
           </h1>
+          {adminLogin && (
+            <p className="text-[13px] mb-4" style={{ color: "#292B2F" }}>
+              Use your staff account. Admin tools depend on the roles assigned
+              to your account.
+            </p>
+          )}
           <p className="text-[13px] mb-8" style={{ color: "#292B2F" }}>
             New here?{" "}
             <Link

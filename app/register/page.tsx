@@ -8,14 +8,16 @@
 import { useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { apiClient } from "../lib/api"
+import BrandLogo from "../components/BrandLogo"
+import { getApiErrorMessage } from "../lib/rtk-api"
+import { useRegisterMutation } from "../lib/auth/rtk"
 
 const STEPS = ["Account", "Profile", "Done"]
 
 export default function RegisterPage() {
   const router = useRouter()
+  const [register, { isLoading: loading }] = useRegisterMutation()
   const [step, setStep] = useState(0)
-  const [loading, setLoading] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -42,6 +44,9 @@ export default function RegisterPage() {
     const e: Record<string, string> = {}
     if (!firstName.trim()) e.firstName = "First name is required"
     if (!lastName.trim()) e.lastName = "Last name is required"
+    if (!phone.trim()) e.phone = "Phone number is required"
+    else if (!/^\+?[0-9\s()\-.]{7,}$/.test(phone.trim()))
+      e.phone = "Enter a valid phone number"
     return e
   }
 
@@ -56,19 +61,27 @@ export default function RegisterPage() {
       const errs = validate1()
       setErrors(errs)
       if (Object.keys(errs).length) return
-      setLoading(true)
       try {
-        await apiClient.register(email, password)
+        await register({
+          email,
+          password,
+          profile: {
+            firstName: firstName.trim(),
+            lastName: lastName.trim(),
+            phoneNumber: phone.trim(),
+            eventAlerts: true,
+            exclusivePresaleOffers: true,
+          },
+        }).unwrap()
+        window.localStorage.setItem("restub_email", email)
+        window.localStorage.setItem("restub_first_name", firstName.trim())
+        window.localStorage.setItem("restub_last_name", lastName.trim())
+        window.localStorage.setItem("restub_phone_number", phone.trim())
         setStep(2)
       } catch (error) {
         setErrors({
-          form:
-            error instanceof Error
-              ? error.message
-              : "Unable to create account.",
+          form: getApiErrorMessage(error, "Unable to create account."),
         })
-      } finally {
-        setLoading(false)
       }
     }
   }
@@ -80,15 +93,7 @@ export default function RegisterPage() {
         className="hidden lg:flex flex-col justify-between w-[420px] shrink-0 p-10"
         style={{ backgroundColor: "#111111", color: "#FAFAF7" }}
       >
-        <Link href="/" className="text-[16px] font-bold tracking-tight">
-          resale
-          <span
-            className="font-normal"
-            style={{ color: "rgba(250,250,247,0.5)" }}
-          >
-            .co
-          </span>
-        </Link>
+        <BrandLogo width={140} height={32} className="" />
         <div className="space-y-6">
           {[
             {
@@ -133,16 +138,7 @@ export default function RegisterPage() {
 
       {}
       <div className="flex-1 flex flex-col items-center justify-center px-6 py-12">
-        <Link
-          href="/"
-          className="lg:hidden text-[16px] font-bold tracking-tight mb-8"
-          style={{ color: "#111111" }}
-        >
-          resale
-          <span className="font-normal" style={{ color: "#292B2F" }}>
-            .co
-          </span>
-        </Link>
+        <BrandLogo width={120} height={28} className="lg:hidden mb-8" />
 
         <div className="w-full max-w-sm">
           {}

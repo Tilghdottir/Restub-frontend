@@ -1,25 +1,31 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import AccountPageShell, { ResourceCard } from "../components/AccountPageShell"
-import { apiClient } from "../lib/api"
-import type { PayoutAccount } from "../lib/api-types"
+import ApiErrorNotice from "../components/ApiErrorNotice"
+import { getApiErrorMessage } from "../lib/rtk-api"
+import {
+  useCreatePayoutAccountMutation,
+  useGetPayoutAccountsQuery,
+} from "../lib/payouts/rtk"
 
 export default function PayoutAccountPage() {
-  const [accounts, setAccounts] = useState<PayoutAccount[]>([])
+  const { data: accounts = [], error: accountsError } =
+    useGetPayoutAccountsQuery()
+  const [createPayoutAccount, { isLoading: submitting }] =
+    useCreatePayoutAccountMutation()
   const [open, setOpen] = useState(false)
   const [bankCode, setBankCode] = useState("")
   const [accountNumber, setAccountNumber] = useState("")
   const [accountName, setAccountName] = useState("")
   const [message, setMessage] = useState("")
   const [error, setError] = useState("")
-  const [submitting, setSubmitting] = useState(false)
-  useEffect(() => {
-    void apiClient.getPayoutAccounts().then(setAccounts)
-  }, [])
-
   return (
     <AccountPageShell eyebrow="Seller settings" title="Payout account">
+      <ApiErrorNotice
+        error={accountsError}
+        fallback="Unable to load payout accounts."
+      />
       <div className="space-y-4">
         {accounts.map((account) => (
           <ResourceCard key={account.id}>
@@ -71,29 +77,24 @@ export default function PayoutAccountPage() {
               style={{ borderColor: "#E8E9EB" }}
               onSubmit={async (event) => {
                 event.preventDefault()
-                setSubmitting(true)
                 setMessage("")
                 setError("")
                 try {
-                  await apiClient.createPayoutAccount({
-                    bankCode,
-                    accountNumber,
-                    accountName,
-                  })
+                  await createPayoutAccount({
+                    payload: { bankCode, accountNumber, accountName },
+                  }).unwrap()
                   setMessage("Payout account submitted.")
                   setOpen(false)
                   setBankCode("")
                   setAccountNumber("")
                   setAccountName("")
-                  setAccounts(await apiClient.getPayoutAccounts())
                 } catch (reason) {
                   setError(
-                    reason instanceof Error
-                      ? reason.message
-                      : "Unable to create payout account.",
+                    getApiErrorMessage(
+                      reason,
+                      "Unable to create payout account.",
+                    ),
                   )
-                } finally {
-                  setSubmitting(false)
                 }
               }}
             >

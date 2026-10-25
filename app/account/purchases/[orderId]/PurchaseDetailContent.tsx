@@ -1,29 +1,36 @@
 "use client"
 
 import Link from "next/link"
-import { useEffect, useState } from "react"
 import AccountSidebar from "../../../components/AccountSidebar"
-import { apiClient } from "../../../lib/api"
-import type { OrderDetailResponse } from "../../../lib/api-types"
+import { useGetOrderDetailQuery } from "../../../lib/orders/rtk"
 
 export default function PurchaseDetailContent({
   orderId,
 }: {
   orderId: string
 }) {
-  const [order, setOrder] = useState<OrderDetailResponse | null>(null)
+  const { data: order, isLoading, error } = useGetOrderDetailQuery(orderId)
 
-  useEffect(() => {
-    void apiClient.getOrderDetail(orderId).then(setOrder)
-  }, [orderId])
-
-  if (!order) {
+  if (isLoading) {
     return (
       <div className="min-h-screen" style={{ backgroundColor: "#FAFAF7" }}>
         <AccountSidebar />
         <div className="max-w-4xl mx-auto px-6 py-16 text-center">
           <p className="text-[14px]" style={{ color: "#292B2F" }}>
             Loading order details…
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error || !order) {
+    return (
+      <div className="min-h-screen" style={{ backgroundColor: "#FAFAF7" }}>
+        <AccountSidebar />
+        <div className="max-w-4xl mx-auto px-6 py-16 text-center">
+          <p className="text-[14px]" style={{ color: "#292B2F" }}>
+            Unable to load order details.
           </p>
         </div>
       </div>

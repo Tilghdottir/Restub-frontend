@@ -1,19 +1,17 @@
 "use client"
 
-import { useEffect, useState } from "react"
 import Link from "next/link"
 import AccountPageShell, { ResourceCard } from "../components/AccountPageShell"
-import { apiClient } from "../lib/api"
-import type { OrderSummary } from "../lib/api-types"
+import ApiErrorNotice from "../components/ApiErrorNotice"
+import { useGetAccountSummaryQuery } from "../lib/account/rtk"
 
 export default function OrderPage() {
-  const [orders, setOrders] = useState<OrderSummary[]>([])
-  useEffect(() => {
-    void apiClient.getAccountSummary().then((data) => setOrders(data.purchases))
-  }, [])
+  const { data, error } = useGetAccountSummaryQuery()
+  const orders = data?.purchases ?? []
 
   return (
     <AccountPageShell eyebrow="Orders" title="My orders">
+      <ApiErrorNotice error={error} fallback="Unable to load your orders." />
       <div className="space-y-3">
         {orders.map((order) => (
           <ResourceCard key={order.id}>
