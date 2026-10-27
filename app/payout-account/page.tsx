@@ -7,6 +7,7 @@ import { getApiErrorMessage } from "../lib/rtk-api"
 import {
   useCreatePayoutAccountMutation,
   useGetPayoutAccountsQuery,
+  useStartBachsSellerOnboardingMutation,
 } from "../lib/payouts/rtk"
 
 export default function PayoutAccountPage() {
@@ -14,6 +15,8 @@ export default function PayoutAccountPage() {
     useGetPayoutAccountsQuery()
   const [createPayoutAccount, { isLoading: submitting }] =
     useCreatePayoutAccountMutation()
+  const [startBachsOnboarding, { isLoading: onboarding }] =
+    useStartBachsSellerOnboardingMutation()
   const [open, setOpen] = useState(false)
   const [bankCode, setBankCode] = useState("")
   const [accountNumber, setAccountNumber] = useState("")
@@ -27,6 +30,45 @@ export default function PayoutAccountPage() {
         fallback="Unable to load payout accounts."
       />
       <div className="space-y-4">
+        <ResourceCard>
+          <h2
+            className="text-[15px] font-semibold"
+            style={{ color: "#111111" }}
+          >
+            Bachs seller payouts
+          </h2>
+          <p className="text-[13px] mt-1 mb-4" style={{ color: "#292B2F" }}>
+            Connect your seller account to receive Bachs escrow releases.
+          </p>
+          <button
+            type="button"
+            disabled={onboarding}
+            onClick={async () => {
+              setError("")
+              setMessage("")
+              try {
+                const result = await startBachsOnboarding().unwrap()
+                window.location.assign(result.onboardingUrl)
+              } catch (reason) {
+                setError(
+                  getApiErrorMessage(
+                    reason,
+                    "Unable to start Bachs seller onboarding.",
+                  ),
+                )
+              }
+            }}
+            className="px-5 py-3 rounded-lg text-[13px] font-semibold disabled:opacity-60"
+            style={{ backgroundColor: "#111111", color: "#FAFAF7" }}
+          >
+            {onboarding ? "Opening onboarding…" : "Connect Bachs account"}
+          </button>
+        </ResourceCard>
+        {error && !open && (
+          <p className="text-[13px] text-red-800" role="alert">
+            {error}
+          </p>
+        )}
         {accounts.map((account) => (
           <ResourceCard key={account.id}>
             <div className="flex items-center justify-between gap-4">

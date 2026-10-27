@@ -12,6 +12,7 @@ import {
 } from "../lib/listings/ticket-types"
 import type { OrderSummary } from "../lib/orders/models"
 import { useGetAccountSummaryQuery } from "../lib/account/rtk"
+import { useGetKycProfileQuery } from "../lib/kyc/rtk"
 
 const tabs = ["My Purchases", "My Listings"] as const
 
@@ -20,6 +21,11 @@ type TabKey = typeof tabs[number]
 export default function AccountPage() {
   const [activeTab, setActiveTab] = useState<TabKey>("My Purchases")
   const { data, error } = useGetAccountSummaryQuery()
+  const {
+    data: kycProfile,
+    error: kycError,
+    isLoading: kycLoading,
+  } = useGetKycProfileQuery()
 
   const purchases = data?.purchases ?? []
   const listings = data?.listings ?? []
@@ -44,6 +50,70 @@ export default function AccountPage() {
             Avery Stone
           </h1>
         </div>
+
+        <section
+          className="mb-6 rounded-lg border bg-white p-5"
+          style={{ borderColor: "#E8E9EB" }}
+        >
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p
+                className="text-[11px] font-medium tracking-widest uppercase"
+                style={{ color: "#292B2F" }}
+              >
+                Identity verification
+              </p>
+              <h2
+                className="mt-1 text-[16px] font-semibold"
+                style={{ color: "#111111" }}
+              >
+                {kycLoading
+                  ? "Checking verification status…"
+                  : kycProfile?.status === "verified"
+                    ? "Your identity is verified"
+                    : kycProfile?.status === "pending" ||
+                        kycProfile?.status === "requires_review"
+                      ? "Your verification is being reviewed"
+                      : kycProfile?.status === "rejected"
+                        ? "Identity verification needs attention"
+                        : "Complete identity verification"}
+              </h2>
+              <p className="mt-1 text-[13px]" style={{ color: "#292B2F" }}>
+                {kycError
+                  ? "View your verification status or submit identity details."
+                  : kycProfile?.status === "verified"
+                    ? "Your account verification status is up to date."
+                    : kycProfile?.status === "pending" ||
+                        kycProfile?.status === "requires_review"
+                      ? "We’ll update your status when review is complete."
+                      : kycProfile?.status === "rejected"
+                        ? "Review the status and submit updated details if needed."
+                        : "Some payment and seller flows may require account verification."}
+              </p>
+            </div>
+            <Link
+              href="/account/kyc"
+              className="inline-flex shrink-0 items-center justify-center rounded-lg px-5 py-3 text-[13px] font-semibold"
+              style={{ backgroundColor: "#111111", color: "#FAFAF7" }}
+            >
+              {kycProfile?.status === "verified"
+                ? "View verification"
+                : kycProfile?.status
+                  ? "Manage verification"
+                  : "Add KYC"}
+            </Link>
+          </div>
+          {kycError && (
+            <p
+              role="status"
+              className="mt-3 text-[12px]"
+              style={{ color: "#6A5318" }}
+            >
+              Verification status could not be loaded. You can still open the
+              KYC page to continue.
+            </p>
+          )}
+        </section>
 
         <div className="border-b mb-6" style={{ borderColor: "#E8E9EB" }}>
           <div className="flex gap-2">
@@ -116,7 +186,7 @@ export default function AccountPage() {
                         className="font-mono-data text-[16px] font-semibold"
                         style={{ color: "#111111" }}
                       >
-                        ${purchase.total.toLocaleString()}
+                        {formatNaira(purchase.total)}
                       </p>
                     </div>
                     <span

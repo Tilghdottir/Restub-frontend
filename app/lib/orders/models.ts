@@ -11,6 +11,9 @@ export type OrderSummary = {
 
 export type OrderDetailResponse = {
   id: string
+  buyerId: string | null
+  sellerId: string
+  listingId: string
   eventTitle: string
   eventDate: string
   venue: string
@@ -25,6 +28,26 @@ export type OrderDetailResponse = {
   status: OrderStatus
   deliveryMethod: string
   createdAt: string
+  manualDelivery: boolean
+  manualDeliverySubmittedAt: string | null
+  manualDeliveryAcceptedAt: string | null
+}
+
+export type EscrowOperationStatus = {
+  orderId: string
+  escrowStatus: "hold" | "release_pending" | "released" | "refund_pending" | "refunded" | "disputed"
+  releaseStatus: string | null
+  refundStatus: string | null
+}
+
+export type OrderDeliveryResponse = {
+  orderId: string
+  tickets: Array<{
+    slotIndex: number
+    mimeType: string
+    url: string
+    expiresAt: string
+  }>
 }
 
 export type DisputeSummary = {

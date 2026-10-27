@@ -33,8 +33,7 @@ export default function EventDetail({ id }: { id: string }) {
 
   const section = TICKET_SECTIONS[selectedSection]
   const subtotal = section.price * qty
-  const fees = Math.round(subtotal * 0.13)
-  const total = subtotal + fees
+  const total = subtotal
 
   const handleCheckout = () => {
     router.push(`/checkout/${encodeURIComponent(String(event.id))}?qty=${qty}`)
@@ -310,17 +309,6 @@ export default function EventDetail({ id }: { id: string }) {
                   ${subtotal.toLocaleString()}
                 </span>
               </div>
-              <div className="flex justify-between text-[12px]">
-                <span style={{ color: "rgba(250,250,247,0.6)" }}>
-                  Service fees
-                </span>
-                <span
-                  className="font-mono-data"
-                  style={{ color: "rgba(250,250,247,0.8)" }}
-                >
-                  ${fees.toLocaleString()}
-                </span>
-              </div>
               <div
                 className="flex justify-between text-[14px] font-semibold pt-2 border-t"
                 style={{ borderColor: "rgba(250,250,247,0.1)" }}
@@ -330,6 +318,12 @@ export default function EventDetail({ id }: { id: string }) {
                   ${total.toLocaleString()}
                 </span>
               </div>
+              <p
+                className="text-[10px]"
+                style={{ color: "rgba(250,250,247,0.55)" }}
+              >
+                Payment providers may add their own processing fee at checkout.
+              </p>
             </div>
           </div>
           <div className="p-6 pt-0">

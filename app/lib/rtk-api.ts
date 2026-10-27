@@ -67,6 +67,7 @@ export const rtkApi = createApi({
     "Listings",
     "AccountSummary",
     "Order",
+    "Escrow",
     "KycProfile",
     "KycCases",
     "PayoutAccounts",

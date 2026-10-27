@@ -18,16 +18,20 @@ export type PaymentMethod = {
 
 export type TransactionSummary = {
   id: string
-  type: "Purchase" | "Payout" | "Refund"
-  description: string
+  orderId: string
   amount: number
-  status: "Completed" | "Pending" | "Failed"
+  currency: string
+  provider: string
+  providerReference: string | null
+  status: "pending" | "authorized" | "captured" | "failed" | "refunded" | "settled"
   createdAt: string
 }
 
 export type PaymentsData = {
   methods: PaymentMethod[]
   transactions: TransactionSummary[]
+  nextCursor: string | null
+  hasMore: boolean
 }
 
 export type NotificationSummary = {
@@ -35,14 +39,5 @@ export type NotificationSummary = {
   title: string
   body: string
   read: boolean
-  createdAt: string
-}
-
-export type RefundSummary = {
-  id: string
-  orderId: string
-  reason: string
-  amount: number
-  status: "Requested" | "Approved" | "Rejected"
   createdAt: string
 }

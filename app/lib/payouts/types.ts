@@ -19,3 +19,10 @@ export type PayoutAccountApiRecord = {
   createdAt: string
   updatedAt: string
 }
+
+export type BachsOnboardingResponse = {
+  accountId: string
+  transfersStatus: string
+  payoutsStatus: string
+  onboardingUrl: string
+}

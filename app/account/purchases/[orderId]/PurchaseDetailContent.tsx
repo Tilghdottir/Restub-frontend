@@ -2,7 +2,17 @@
 
 import Link from "next/link"
 import AccountSidebar from "../../../components/AccountSidebar"
-import { useGetOrderDetailQuery } from "../../../lib/orders/rtk"
+import { useEffect, useState } from "react"
+import { useAuth } from "../../../hooks/useAuth"
+import { formatNaira } from "../../../lib/money"
+import { getApiErrorMessage } from "../../../lib/rtk-api"
+import {
+  useAcceptOrderDeliveryMutation,
+  useGetEscrowOperationStatusQuery,
+  useGetOrderDeliveryQuery,
+  useGetOrderDetailQuery,
+  useReleaseOrderEscrowMutation,
+} from "../../../lib/orders/rtk"
 
 export default function PurchaseDetailContent({
   orderId,
@@ -10,6 +20,51 @@ export default function PurchaseDetailContent({
   orderId: string
 }) {
   const { data: order, isLoading, error } = useGetOrderDetailQuery(orderId)
+  const { user } = useAuth()
+  const [acceptDelivery, { isLoading: accepting }] =
+    useAcceptOrderDeliveryMutation()
+  const [releaseEscrow, { isLoading: releasing }] =
+    useReleaseOrderEscrowMutation()
+  const [actionError, setActionError] = useState("")
+  const [actionMessage, setActionMessage] = useState("")
+  const canCheckEscrow =
+    order?.status === "paid" || order?.status === "fulfilled"
+  const {
+    data: escrow,
+    isFetching: checkingEscrow,
+    error: escrowError,
+    refetch: refetchEscrow,
+  } = useGetEscrowOperationStatusQuery(orderId, {
+    skip: !canCheckEscrow,
+    refetchOnMountOrArgChange: true,
+  })
+  const escrowPending = Boolean(
+    escrow &&
+      (escrow.escrowStatus === "release_pending" ||
+        escrow.escrowStatus === "refund_pending" ||
+        escrow.releaseStatus === "pending" ||
+        escrow.refundStatus === "pending"),
+  )
+  const isBuyer = Boolean(order && user?.id === order.buyerId)
+  const isSeller = Boolean(order && user?.id === order.sellerId)
+  const { data: delivery, error: deliveryError } = useGetOrderDeliveryQuery(
+    orderId,
+    {
+      skip:
+        !order ||
+        !isBuyer ||
+        !order.manualDelivery ||
+        !order.manualDeliverySubmittedAt,
+    },
+  )
+
+  useEffect(() => {
+    if (!canCheckEscrow || !escrowPending) return
+    const interval = setInterval(() => {
+      void refetchEscrow()
+    }, 5000)
+    return () => clearInterval(interval)
+  }, [canCheckEscrow, escrowPending, refetchEscrow])
 
   if (isLoading) {
     return (
@@ -121,16 +176,10 @@ export default function PurchaseDetailContent({
             >
               <div className="flex justify-between">
                 <span>
-                  {order.quantity} × ${order.unitPrice.toLocaleString()}
+                  {order.quantity} × {formatNaira(order.unitPrice)}
                 </span>
                 <span className="font-mono-data">
-                  ${order.subtotal.toLocaleString()}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span>Service fees</span>
-                <span className="font-mono-data">
-                  ${order.fees.toLocaleString()}
+                  {formatNaira(order.subtotal)}
                 </span>
               </div>
             </div>
@@ -140,7 +189,7 @@ export default function PurchaseDetailContent({
             >
               <span className="text-[14px] font-semibold">Total</span>
               <span className="font-mono-data text-[18px] font-bold">
-                ${order.total.toLocaleString()}
+                {formatNaira(order.total)}
               </span>
             </div>
             <p
@@ -151,6 +200,142 @@ export default function PurchaseDetailContent({
             </p>
           </aside>
         </div>
+
+        {(order.manualDelivery || canCheckEscrow) && (
+          <section
+            className="mt-6 bg-white border rounded-lg p-6"
+            style={{ borderColor: "#E8E9EB" }}
+          >
+            <h2
+              className="text-[16px] font-semibold"
+              style={{ color: "#111111" }}
+            >
+              Delivery and escrow
+            </h2>
+            {order.manualDelivery && (
+              <p className="text-[13px] mt-2" style={{ color: "#292B2F" }}>
+                {order.manualDeliveryAcceptedAt
+                  ? `Delivery accepted ${new Date(order.manualDeliveryAcceptedAt).toLocaleString()}.`
+                  : order.manualDeliverySubmittedAt
+                    ? "The seller submitted the tickets. Review the files and accept delivery when satisfied."
+                    : "Waiting for the seller to deliver the tickets."}
+              </p>
+            )}
+            {canCheckEscrow && (
+              <p className="text-[13px] mt-2" style={{ color: "#292B2F" }}>
+                Escrow status:{" "}
+                {escrow?.escrowStatus.replace(/_/g, " ") ??
+                  (checkingEscrow ? "checking…" : "unavailable")}
+                {escrow?.releaseStatus
+                  ? ` · Release: ${escrow.releaseStatus.replace(/_/g, " ")}`
+                  : ""}
+                {escrow?.refundStatus
+                  ? ` · Refund: ${escrow.refundStatus.replace(/_/g, " ")}`
+                  : ""}
+              </p>
+            )}
+            {escrowError && (
+              <p role="alert" className="text-[13px] mt-2 text-red-800">
+                {getApiErrorMessage(
+                  escrowError,
+                  "Unable to load escrow status.",
+                )}
+              </p>
+            )}
+            {deliveryError && (
+              <p role="alert" className="text-[13px] mt-2 text-red-800">
+                {getApiErrorMessage(
+                  deliveryError,
+                  "Unable to load delivered ticket files.",
+                )}
+              </p>
+            )}
+            {delivery?.tickets.map((ticket) => (
+              <a
+                key={ticket.slotIndex}
+                href={ticket.url}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex mt-3 mr-3 text-[13px] underline underline-offset-2"
+                style={{ color: "#111111" }}
+              >
+                Download ticket {ticket.slotIndex}
+              </a>
+            ))}
+            {actionError && (
+              <p role="alert" className="text-[13px] text-red-800 mt-3">
+                {actionError}
+              </p>
+            )}
+            {actionMessage && (
+              <p role="status" className="text-[13px] text-green-800 mt-3">
+                {actionMessage}
+              </p>
+            )}
+            <div className="flex flex-wrap gap-3 mt-4">
+              {isBuyer &&
+                order.manualDelivery &&
+                order.status === "paid" &&
+                order.manualDeliverySubmittedAt &&
+                !order.manualDeliveryAcceptedAt && (
+                  <button
+                    type="button"
+                    disabled={accepting}
+                    onClick={async () => {
+                      setActionError("")
+                      setActionMessage("")
+                      try {
+                        await acceptDelivery(order.id).unwrap()
+                        setActionMessage("Delivery accepted.")
+                      } catch (reason) {
+                        setActionError(
+                          getApiErrorMessage(
+                            reason,
+                            "Unable to accept delivery.",
+                          ),
+                        )
+                      }
+                    }}
+                    className="px-5 py-3 rounded-lg text-[13px] font-semibold disabled:opacity-60"
+                    style={{ backgroundColor: "#111111", color: "#FAFAF7" }}
+                  >
+                    {accepting ? "Accepting…" : "Accept ticket delivery"}
+                  </button>
+                )}
+              {isSeller &&
+                canCheckEscrow &&
+                escrow?.escrowStatus === "hold" && (
+                  <button
+                    type="button"
+                    disabled={releasing || escrow.releaseStatus === "pending"}
+                    onClick={async () => {
+                      setActionError("")
+                      setActionMessage("")
+                      try {
+                        await releaseEscrow({ orderId: order.id }).unwrap()
+                        setActionMessage(
+                          "Release started. The provider may take time to confirm settlement.",
+                        )
+                      } catch (reason) {
+                        setActionError(
+                          getApiErrorMessage(
+                            reason,
+                            "Unable to release escrow.",
+                          ),
+                        )
+                      }
+                    }}
+                    className="px-5 py-3 rounded-lg text-[13px] font-semibold disabled:opacity-60"
+                    style={{ backgroundColor: "#111111", color: "#FAFAF7" }}
+                  >
+                    {releasing || escrow.releaseStatus === "pending"
+                      ? "Release pending…"
+                      : "Release escrow"}
+                  </button>
+                )}
+            </div>
+          </section>
+        )}
       </main>
     </div>
   )

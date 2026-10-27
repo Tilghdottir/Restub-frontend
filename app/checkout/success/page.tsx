@@ -3,12 +3,14 @@
 import Link from "next/link"
 import { useEffect, useState } from "react"
 import Header from "../../components/Header"
+import { useAuth } from "../../hooks/useAuth"
 import { useLazyGetOrderDetailQuery } from "../../lib/orders/rtk"
 
 type PaymentResult = "checking" | "confirmed" | "pending" | "cancelled" | "error"
 
 export default function CheckoutSuccessPage() {
   const [fetchOrder] = useLazyGetOrderDetailQuery()
+  const { isAuthenticated, isLoading: authLoading } = useAuth()
   const [orderId, setOrderId] = useState("")
   const [result, setResult] = useState<PaymentResult>("checking")
 
@@ -21,7 +23,9 @@ export default function CheckoutSuccessPage() {
       return
     }
 
-    if (!window.localStorage.getItem("restub_access_token")) {
+    if (authLoading) return
+
+    if (!isAuthenticated) {
       setResult("pending")
       return
     }
@@ -59,7 +63,7 @@ export default function CheckoutSuccessPage() {
       active = false
       clearTimeout(timer)
     }
-  }, [fetchOrder])
+  }, [authLoading, fetchOrder, isAuthenticated])
 
   const copy = {
     checking: {
@@ -75,7 +79,7 @@ export default function CheckoutSuccessPage() {
     pending: {
       eyebrow: "Payment processing",
       title: "Your payment is not confirmed yet.",
-      body: "EscrowPay returned you to ReStub, but that redirect alone does not confirm payment. Check your email or account for the updated order status.",
+      body: "The payment provider returned you to ReStub, but that redirect alone does not confirm payment. Check your email or account for the updated order status.",
     },
     cancelled: {
       eyebrow: "Order cancelled",

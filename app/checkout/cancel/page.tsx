@@ -15,16 +15,23 @@ export default function CheckoutCancelPage() {
     <div className="min-h-screen" style={{ backgroundColor: "#FAFAF7" }}>
       <Header />
       <main className="max-w-xl mx-auto px-6 py-16">
-        <div className="bg-white border rounded-lg p-8 text-center" style={{ borderColor: "#E8E9EB" }}>
-          <p className="text-[11px] font-medium tracking-widest uppercase" style={{ color: "#292B2F" }}>
-            Checkout cancelled
+        <div
+          className="bg-white border rounded-lg p-8 text-center"
+          style={{ borderColor: "#E8E9EB" }}
+        >
+          <p
+            className="text-[11px] font-medium tracking-widest uppercase"
+            style={{ color: "#292B2F" }}
+          >
+            Checkout not confirmed
           </p>
           <h1 className="mt-2 text-3xl font-bold" style={{ color: "#111111" }}>
             Payment was not confirmed.
           </h1>
           <p className="mt-3 text-[14px]" style={{ color: "#292B2F" }}>
-            You returned from EscrowPay without completing checkout. This redirect does not establish
-            the backend order status. Check your account or email before starting another payment.
+            You returned from the payment provider without a confirmed result.
+            This redirect does not establish the backend order status. Check
+            your account or email before starting another payment.
           </p>
           {orderId && (
             <p className="mt-3 text-[12px]" style={{ color: "#292B2F" }}>
@@ -42,7 +49,11 @@ export default function CheckoutCancelPage() {
             <Link
               href="/"
               className="inline-flex items-center justify-center rounded-lg border px-5 py-3 text-[14px] font-semibold"
-              style={{ borderColor: "#E8E9EB", color: "#111111", backgroundColor: "#FFFFFF" }}
+              style={{
+                borderColor: "#E8E9EB",
+                color: "#111111",
+                backgroundColor: "#FFFFFF",
+              }}
             >
               Continue browsing
             </Link>

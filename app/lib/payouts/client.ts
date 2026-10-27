@@ -1,4 +1,5 @@
 import type {
+  BachsOnboardingResponse,
   CreatePayoutAccountRequest,
   PayoutAccountApiRecord,
 } from "./types"
@@ -65,4 +66,44 @@ export async function createPayoutAccount(
     headers: { "idempotency-key": idempotencyKey },
     body: JSON.stringify(payload),
   })
+}
+
+export async function startBachsSellerOnboarding(
+  idempotencyKey = createIdempotencyKey(),
+): Promise<BachsOnboardingResponse> {
+  const result = expectRecord(
+    await authenticatedRequest<unknown>("/bachs/seller-account/onboarding", {
+      method: "POST",
+      headers: { "idempotency-key": idempotencyKey },
+    }),
+    "Bachs seller onboarding",
+  )
+  const onboardingUrl = requireString(
+    result,
+    "onboardingUrl",
+    "Bachs seller onboarding",
+  )
+  let url: URL
+  try {
+    url = new URL(onboardingUrl)
+  } catch {
+    throw new Error("Invalid API response: onboardingUrl must be a URL.")
+  }
+  if (url.protocol !== "https:") {
+    throw new Error("Invalid API response: onboardingUrl must use HTTPS.")
+  }
+  return {
+    accountId: requireString(result, "accountId", "Bachs seller onboarding"),
+    transfersStatus: requireString(
+      result,
+      "transfersStatus",
+      "Bachs seller onboarding",
+    ),
+    payoutsStatus: requireString(
+      result,
+      "payoutsStatus",
+      "Bachs seller onboarding",
+    ),
+    onboardingUrl: url.toString(),
+  }
 }

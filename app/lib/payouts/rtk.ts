@@ -1,5 +1,9 @@
 import type { CreatePayoutAccountRequest } from "./types"
-import { createPayoutAccount, getPayoutAccounts } from "./client"
+import {
+  createPayoutAccount,
+  getPayoutAccounts,
+  startBachsSellerOnboarding,
+} from "./client"
 import { rtkApi, runQuery } from "../rtk-api"
 
 const payoutsApi = rtkApi.injectEndpoints({
@@ -18,8 +22,18 @@ const payoutsApi = rtkApi.injectEndpoints({
           runQuery(() => createPayoutAccount(payload, idempotencyKey)),
         invalidatesTags: ["PayoutAccounts"],
       }),
+    startBachsSellerOnboarding:
+      builder.mutation<Awaited<ReturnType<typeof startBachsSellerOnboarding>>, {
+        idempotencyKey?: string
+      } | void>({
+        queryFn: (input) =>
+          runQuery(() => startBachsSellerOnboarding(input?.idempotencyKey)),
+      }),
   }),
 })
 
-export const { useGetPayoutAccountsQuery, useCreatePayoutAccountMutation } =
-  payoutsApi
+export const {
+  useGetPayoutAccountsQuery,
+  useCreatePayoutAccountMutation,
+  useStartBachsSellerOnboardingMutation,
+} = payoutsApi

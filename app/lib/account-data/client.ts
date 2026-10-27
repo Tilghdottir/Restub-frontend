@@ -1,8 +1,6 @@
 import type {
   NotificationSummary,
-  PaymentMethod,
   PaymentsData,
-  RefundSummary,
   TicketSummary,
   TransactionSummary,
 } from "./types"
@@ -11,14 +9,21 @@ import {
   asString,
   expectArray,
   expectRecord,
+  parseCursorPage,
   requireNumber,
+  requireNullableString,
   requireOneOf,
   requireString,
 } from "../api/parse"
 import { authenticatedRequest } from "../auth/request"
 import type { TicketStatus } from "../orders/types"
+import { createIdempotencyKey } from "../api/device"
 
 type PaymentRecord = Record<string, unknown>
+type RefundRequestResponse = {
+  orderId: string
+  status: string
+}
 
 const ticketStatuses = [
   "issued",
@@ -26,24 +31,6 @@ const ticketStatuses = [
   "cancelled",
   "expired",
 ] as const satisfies readonly TicketStatus[]
-
-function hasMethodShape(payment: PaymentRecord): boolean {
-  return (
-    "brand" in payment ||
-    "last4" in payment ||
-    "expiry" in payment ||
-    "isDefault" in payment
-  )
-}
-
-function hasTransactionShape(payment: PaymentRecord): boolean {
-  return (
-    "type" in payment ||
-    "amount" in payment ||
-    "description" in payment ||
-    "reference" in payment
-  )
-}
 
 function toDeliveryStatus(value: unknown): TicketSummary["deliveryStatus"] {
   if (value === undefined || value === null) return "Pending"
@@ -89,76 +76,49 @@ export async function getTickets(): Promise<TicketSummary[]> {
   })
 }
 
-export async function getPayments(): Promise<PaymentsData> {
-  const result = await authenticatedRequest<unknown>("/payments")
-  const payments = expectArray(result, "payments").map((item) =>
-    expectRecord(item, "payment"),
+export async function getPayments(cursor?: string): Promise<PaymentsData> {
+  const query = new URLSearchParams({ limit: "25" })
+  if (cursor) query.set("cursor", cursor)
+  const response = await authenticatedRequest<unknown>(
+    `/payments?${query.toString()}`,
+    {},
+    { unwrapEnvelope: false },
   )
-
-  const methods = payments.flatMap((payment) => {
-    if (!hasMethodShape(payment)) return []
-
-    return [
-      {
-        id: requireString(payment, "id", "payment"),
-        brand: requireOneOf(
-          payment,
-          "brand",
-          ["Visa", "Mastercard", "Amex"] as const,
-          "payment",
-        ),
-        last4: requireString(payment, "last4", "payment"),
-        expiry: requireString(payment, "expiry", "payment"),
-        isDefault: asBoolean(payment.isDefault),
-      },
-    ]
+  const page = parseCursorPage(response, "payments")
+  const transactions: TransactionSummary[] = page.items.map((item) => {
+    const payment: PaymentRecord = expectRecord(item, "payment")
+    return {
+      id: requireString(payment, "id", "payment"),
+      orderId: requireString(payment, "orderId", "payment"),
+      amount: requireNumber(payment, "amount", "payment"),
+      currency: requireString(payment, "currency", "payment"),
+      provider: requireString(payment, "provider", "payment"),
+      providerReference: requireNullableString(
+        payment,
+        "providerReference",
+        "payment",
+      ),
+      status: requireOneOf(
+        payment,
+        "status",
+        [
+          "pending",
+          "authorized",
+          "captured",
+          "failed",
+          "refunded",
+          "settled",
+        ] as const,
+        "payment",
+      ),
+      createdAt: requireString(payment, "createdAt", "payment"),
+    }
   })
-
-  const transactions = payments.flatMap((payment) => {
-    if (!hasTransactionShape(payment)) return []
-
-    return [
-      {
-        id: requireString(payment, "id", "payment"),
-        type: requireOneOf(
-          payment,
-          "type",
-          ["Purchase", "Payout", "Refund"] as const,
-          "payment",
-        ),
-        description: requireString(
-          {
-            ...payment,
-            description: payment.description ?? payment.reference,
-          },
-          "description",
-          "payment",
-        ),
-        amount: requireNumber(payment, "amount", "payment"),
-        status: requireOneOf(
-          payment,
-          "status",
-          ["Completed", "Pending", "Failed"] as const,
-          "payment",
-        ),
-        createdAt: requireString(payment, "createdAt", "payment"),
-      },
-    ]
-  })
-
-  if (
-    payments.some(
-      (payment) => !hasMethodShape(payment) && !hasTransactionShape(payment),
-    )
-  ) {
-    throw new Error(
-      "Invalid API response: payment record does not match a known payment shape.",
-    )
-  }
-
   return {
-    methods,
+    methods: [],
     transactions,
+    nextCursor: page.nextCursor,
+    hasMore: page.hasMore,
   }
 }
 
@@ -176,8 +136,22 @@ export async function getNotifications(): Promise<NotificationSummary[]> {
   })
 }
 
-export async function getRefunds(): Promise<RefundSummary[]> {
-  throw new Error(
-    "Refund history is not exposed by the backend Swagger contract yet",
+export async function requestRefund(
+  orderId: string,
+  idempotencyKey = createIdempotencyKey(),
+): Promise<RefundRequestResponse> {
+  const result = expectRecord(
+    await authenticatedRequest<unknown>(
+      `/refunds/${encodeURIComponent(orderId)}`,
+      {
+        method: "POST",
+        headers: { "idempotency-key": idempotencyKey },
+      },
+    ),
+    "refund response",
   )
+  return {
+    orderId: requireString(result, "orderId", "refund response"),
+    status: requireString(result, "status", "refund response"),
+  }
 }

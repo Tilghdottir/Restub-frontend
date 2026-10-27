@@ -14,6 +14,7 @@ import { useParams, useRouter, useSearchParams } from "next/navigation"
 import { Suspense, useEffect, useRef, useState } from "react"
 import BrandLogo from "../components/BrandLogo"
 import Header from "../components/Header"
+import { useAuth } from "../hooks/useAuth"
 import { formatNaira } from "../lib/money"
 import { getApiErrorMessage } from "../lib/rtk-api"
 import { useLazyGetListingByIdQuery } from "../lib/listings/rtk"
@@ -29,7 +30,6 @@ const ID_TYPES = [
   { value: "nin", label: "National Identity Number" },
   { value: "bvn", label: "Bank Verification Number (BVN)" },
 ]
-const escrowPayCheckoutUrl = process.env.NEXT_PUBLIC_ESCROWPAY_CHECKOUT_URL
 
 type IdType = "bvn" | "nin"
 
@@ -50,6 +50,8 @@ function isValidDateOfBirth(value: string): boolean {
 
 function CheckoutPageContent() {
   const router = useRouter()
+  const { isAuthenticated, isLoading: authLoading } = useAuth()
+  const authChecked = !authLoading
   const [submitCheckout] = useSubmitCheckoutMutation()
   const params = useParams<{ listingId?: string }>()
   const searchParams = useSearchParams()
@@ -76,17 +78,12 @@ function CheckoutPageContent() {
   const [lastName, setLastName] = useState("")
   const [customerEmail, setCustomerEmail] = useState("")
   const [phone, setPhone] = useState("")
-  const [authChecked, setAuthChecked] = useState(false)
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [id_type, setIdType] = useState<IdType | "">("")
   const [id_number, setIdNumber] = useState("")
   const [dateOfBirth, setDateOfBirth] = useState("")
   const [identityConsent, setIdentityConsent] = useState(false)
-  const [cardName, setCardName] = useState("")
-  const [cardNumber, setCardNumber] = useState("")
-  const [expiry, setExpiry] = useState("")
-  const [cvv, setCvv] = useState("")
-  const [zip, setZip] = useState("")
+  const [identityRequired, setIdentityRequired] = useState(false)
+  const [accountKycRequired, setAccountKycRequired] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [submitError, setSubmitError] = useState("")
 
@@ -94,12 +91,6 @@ function CheckoutPageContent() {
   const resetIdempotencyKey = () => {
     idempotencyKey.current = null
   }
-
-  useEffect(() => {
-    const accessToken = window.localStorage.getItem("restub_access_token")
-    setIsAuthenticated(Boolean(accessToken))
-    setAuthChecked(true)
-  }, [])
 
   useEffect(() => {
     if (!listingIdFromQuery) {
@@ -150,19 +141,8 @@ function CheckoutPageContent() {
 
   const priceEach = listing?.price ?? 0
   const subtotal = priceEach * qty
-  const fees = Math.round(subtotal * 0.13)
-  const total = subtotal + fees
+  const total = subtotal
   const isPackage = isTicketPackage(listing?.ticketType)
-
-  const formatCardNumber = (v: string) =>
-    v.replace(/\D/g, "")
-      .slice(0, 16)
-      .replace(/(\d{4})(?=\d)/g, "$1 ")
-
-  const formatExpiry = (v: string) =>
-    v.replace(/\D/g, "")
-      .slice(0, 4)
-      .replace(/(\d{2})(?=\d)/, "$1/")
 
   const validateContact = () => {
     const nextErrors: Record<string, string> = {}
@@ -191,18 +171,6 @@ function CheckoutPageContent() {
     return next
   }
 
-  const validatePayment = () => {
-    const nextErrors: Record<string, string> = {}
-    if (!cardName.trim()) nextErrors.cardName = "Name on card is required"
-    if (cardNumber.replace(/\s/g, "").length < 16) {
-      nextErrors.cardNumber = "Enter a valid 16-digit card number"
-    }
-    if (expiry.length < 5) nextErrors.expiry = "Enter a valid expiry date"
-    if (cvv.length < 3) nextErrors.cvv = "Enter a valid CVV"
-    if (!zip.trim()) nextErrors.zip = "Billing ZIP is required"
-    return nextErrors
-  }
-
   const handleDetails = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
 
@@ -213,7 +181,13 @@ function CheckoutPageContent() {
       return
     }
     const contactErrors = validateContact()
-    const kycErrors = !isAuthenticated ? validateGuestKyc() : {}
+    const hasGuestIdentityDetails = Boolean(
+      id_type || id_number.trim() || dateOfBirth || identityConsent,
+    )
+    const kycErrors =
+      !isAuthenticated && (identityRequired || hasGuestIdentityDetails)
+        ? validateGuestKyc()
+        : {}
     const nextErrors = { ...contactErrors, ...kycErrors }
     setErrors(nextErrors)
     if (!authChecked || Object.keys(nextErrors).length > 0) return
@@ -269,8 +243,7 @@ function CheckoutPageContent() {
         return
       }
 
-      const checkoutUrl =
-        response.checkoutUrl ?? response.payment?.authorizationUrl ?? null
+      const checkoutUrl = response.checkoutUrl ?? null
       if (checkoutUrl) {
         const hostedCheckout = new URL(checkoutUrl)
         if (hostedCheckout.protocol !== "https:") {
@@ -286,12 +259,25 @@ function CheckoutPageContent() {
         `/checkout/success?orderId=${encodeURIComponent(response.order.id)}`,
       )
     } catch (error) {
-      setSubmitError(
-        getApiErrorMessage(
-          error,
-          "Checkout could not be completed. Please try again.",
-        ),
+      const message = getApiErrorMessage(
+        error,
+        "Checkout could not be completed. Please try again.",
       )
+      if (
+        /Guest checkout requires BVN or NIN details|Retrying guest checkout verification requires the original identity details and consent/i.test(
+          message,
+        )
+      ) {
+        setIdentityRequired(true)
+      } else if (
+        isAuthenticated &&
+        /^Complete EscrowPay identity verification before checkout/i.test(
+          message,
+        )
+      ) {
+        setAccountKycRequired(true)
+      }
+      setSubmitError(message)
     } finally {
       setLoading(false)
     }
@@ -725,17 +711,19 @@ function CheckoutPageContent() {
                       </p>
                     ) : (
                       !isAuthenticated && (
-                        <div
+                        <details
+                          open={identityRequired || undefined}
                           className="bg-white border rounded-lg p-5"
                           style={{ borderColor: "#E8E9EB" }}
                         >
-                          <h2 className="text-[12px] font-semibold uppercase tracking-wide mb-4 text-[#111111]">
-                            KYC details
-                          </h2>
-                          <p className="text-[13px] mb-4 text-[#292B2F]">
-                            For escrow and fraud prevention purposes, we require
-                            identity verification for checkout. Please provide
-                            your ID details below.
+                          <summary className="cursor-pointer text-[12px] font-semibold uppercase tracking-wide text-[#111111]">
+                            Identity details{" "}
+                            {identityRequired ? "(required)" : "(if requested)"}
+                          </summary>
+                          <p className="text-[13px] mt-3 mb-4 text-[#292B2F]">
+                            Some checkout providers require guest identity
+                            verification. We will request these details only if
+                            the checkout service requires them.
                           </p>
                           <div className="grid md:grid-cols-2 gap-3">
                             <div className="md:col-span-2">
@@ -897,7 +885,7 @@ function CheckoutPageContent() {
                               </p>
                             )}
                           </div>
-                        </div>
+                        </details>
                       )
                     )}
 
@@ -911,6 +899,14 @@ function CheckoutPageContent() {
                         }}
                       >
                         {submitError}
+                        {accountKycRequired && (
+                          <Link
+                            href="/kyc"
+                            className="ml-1 font-semibold underline underline-offset-2"
+                          >
+                            Complete account verification
+                          </Link>
+                        )}
                       </div>
                     )}
 
@@ -927,18 +923,20 @@ function CheckoutPageContent() {
                       <div className="space-y-2 text-center">
                         <button
                           type="submit"
-                          className="flex min-h-12 w-full items-center justify-center rounded-lg border border-[#E8E9EB] bg-white px-4 py-2"
+                          disabled={loading}
+                          className="w-full py-3 rounded-lg text-[14px] font-semibold disabled:opacity-60"
+                          style={{
+                            backgroundColor: "#111111",
+                            color: "#FAFAF7",
+                          }}
                         >
-                          <img
-                            src="https://docs.escrowpay.app/brand/checkout-button/pay-with-escrowpay-dark@2x.png"
-                            srcSet="https://docs.escrowpay.app/brand/checkout-button/pay-with-escrowpay-dark@1x.png 1x, https://docs.escrowpay.app/brand/checkout-button/pay-with-escrowpay-dark@2x.png 2x, https://docs.escrowpay.app/brand/checkout-button/pay-with-escrowpay-dark@3x.png 3x"
-                            alt=""
-                            aria-hidden="true"
-                            height="40"
-                          />
+                          {loading
+                            ? "Starting checkout…"
+                            : "Continue to secure checkout"}
                         </button>
                         <p className="text-[11px] text-[#8A8D91]">
-                          EscrowPay checkout is not configured yet.
+                          You’ll continue with the payment provider selected for
+                          this checkout.
                         </p>
                       </div>
                     )}
@@ -978,12 +976,10 @@ function CheckoutPageContent() {
                 >
                   {[
                     {
-                      label: `${isPackage ? "Packages" : "Tickets"} · ${qty}`,
+                      label: `Order amount · ${qty} ${
+                        isPackage ? "package(s)" : "ticket(s)"
+                      }`,
                       value: formatNaira(subtotal),
-                    },
-                    {
-                      label: "Service fees",
-                      value: formatNaira(fees),
                     },
                   ].map(({ label, value }) => (
                     <div
@@ -1008,6 +1004,13 @@ function CheckoutPageContent() {
                     {formatNaira(total)}
                   </span>
                 </div>
+                <p
+                  className="mt-3 text-[11px]"
+                  style={{ color: "rgba(250,250,247,0.55)" }}
+                >
+                  The order amount is based on the listing price. Your payment
+                  provider may add its own processing fee before payment.
+                </p>
               </div>
             </aside>
           </div>

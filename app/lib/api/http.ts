@@ -7,9 +7,10 @@ export const API_BASE_URL = (
     : "http://localhost:3000/api")
 ).replace(/\/+$/, "")
 
-const API_PROXY_BASE = `${
-  process.env.NODE_ENV === "production" ? "/Restub-frontend" : ""
-}/api`
+const API_PROXY_BASE = `${(process.env.NEXT_PUBLIC_BASE_PATH ?? "").replace(
+  /\/+$/,
+  "",
+)}/api`
 
 export function getApiProxyUrl(path: string): string {
   return `${API_PROXY_BASE}${path}`

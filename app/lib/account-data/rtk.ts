@@ -1,4 +1,9 @@
-import { getNotifications, getPayments, getRefunds, getTickets } from "./client"
+import {
+  getNotifications,
+  getPayments,
+  getTickets,
+  requestRefund,
+} from "./client"
 import { rtkApi, runQuery } from "../rtk-api"
 
 const accountDataApi = rtkApi.injectEndpoints({
@@ -7,18 +12,25 @@ const accountDataApi = rtkApi.injectEndpoints({
       queryFn: () => runQuery(() => getTickets()),
       providesTags: ["Tickets"],
     }),
-    getPayments: builder.query<Awaited<ReturnType<typeof getPayments>>, void>({
-      queryFn: () => runQuery(() => getPayments()),
-      providesTags: ["PaymentMethods", "Transactions"],
-    }),
+    getPayments:
+      builder.query<Awaited<ReturnType<typeof getPayments>>, string | undefined>(
+        {
+          queryFn: (cursor) => runQuery(() => getPayments(cursor)),
+          providesTags: ["PaymentMethods", "Transactions"],
+        },
+      ),
     getNotifications:
       builder.query<Awaited<ReturnType<typeof getNotifications>>, void>({
         queryFn: () => runQuery(() => getNotifications()),
         providesTags: ["Notifications"],
       }),
-    getRefunds: builder.query<Awaited<ReturnType<typeof getRefunds>>, void>({
-      queryFn: () => runQuery(() => getRefunds()),
-      providesTags: ["Refunds"],
+    requestRefund: builder.mutation<Awaited<ReturnType<typeof requestRefund>>, {
+      orderId: string
+      idempotencyKey?: string
+    }>({
+      queryFn: ({ orderId, idempotencyKey }) =>
+        runQuery(() => requestRefund(orderId, idempotencyKey)),
+      invalidatesTags: ["Refunds", "Order", "Escrow", "Transactions"],
     }),
   }),
 })
@@ -27,5 +39,6 @@ export const {
   useGetTicketsQuery,
   useGetPaymentsQuery,
   useGetNotificationsQuery,
-  useGetRefundsQuery,
+  useLazyGetPaymentsQuery,
+  useRequestRefundMutation,
 } = accountDataApi

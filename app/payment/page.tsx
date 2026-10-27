@@ -5,7 +5,7 @@ import ApiErrorNotice from "../components/ApiErrorNotice"
 import { useGetPaymentsQuery } from "../lib/account-data/rtk"
 
 export default function PaymentPage() {
-  const { data, error } = useGetPaymentsQuery()
+  const { data, error } = useGetPaymentsQuery(undefined)
   const methods = data?.methods ?? []
 
   return (
@@ -40,12 +40,12 @@ export default function PaymentPage() {
             </div>
           </ResourceCard>
         ))}
-        <button
-          className="px-5 py-3 rounded-lg text-[13px] font-semibold"
-          style={{ backgroundColor: "#111111", color: "#FAFAF7" }}
-        >
-          Add payment method
-        </button>
+        {methods.length === 0 && (
+          <p className="text-[13px]" style={{ color: "#292B2F" }}>
+            Saved payment methods are not exposed by the current payments API.
+            Payments use the secure provider checkout instead.
+          </p>
+        )}
       </div>
     </AccountPageShell>
   )

@@ -99,7 +99,7 @@ export default function RegisterPage() {
             {
               icon: "✓",
               title: "No hidden fees",
-              desc: "All service fees shown upfront before you pay.",
+              desc: "See the order amount and any provider fees before payment.",
             },
             {
               icon: "★",

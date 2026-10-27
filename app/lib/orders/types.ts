@@ -22,36 +22,33 @@ export type CheckoutRequest = {
 
 export type OrderApiRecord = {
   id: string
-  buyerId: string
+  buyerId: string | null
   buyerEmail: string | null
   sellerId: string
   listingId: string
   quantity: number
+  manualDelivery: boolean
+  manualDeliverySubmittedAt: string | null
+  manualDeliveryAcceptedAt: string | null
   totalAmount: number
   status: OrderStatus
   createdAt: string
   updatedAt: string
-  deleted: boolean
 }
 
-export type PaymentApiRecord = {
+export type CheckoutTransactionApiRecord = {
   id: string
-  orderId: string
-  buyerId: string
-  sellerId: string
+  provider: string
+  providerReference: string
   amount: number
   currency: string
-  provider: string
-  providerReference: string | null
-  status: PaymentStatus
-  createdAt: string
-  updatedAt: string
+  status: string
 }
 
 export type TicketApiRecord = {
   id: string
   orderId: string
-  buyerId: string
+  buyerId: string | null
   sellerId: string
   listingId: string
   code: string
@@ -62,12 +59,8 @@ export type TicketApiRecord = {
 }
 
 export type CheckoutResponse = {
-  order: Omit<OrderApiRecord, "status"> & {
-    status: OrderStatus
-  }
-  payment?: PaymentApiRecord & {
-    authorizationUrl?: string | null
-  }
+  order: OrderApiRecord
+  transaction?: CheckoutTransactionApiRecord
   ticket?: TicketApiRecord
   checkoutUrl?: string | null
   verification?: {

@@ -1,11 +1,14 @@
 import type { CheckoutRequest, CheckoutResponse } from "./types"
-import type { DisputeSummary, OrderDetailResponse } from "./models"
+import type {
+  DisputeSummary,
+  EscrowOperationStatus,
+  OrderDeliveryResponse,
+  OrderDetailResponse,
+} from "./models"
 import {
-  asRecord,
   asString,
-  requireBoolean,
-  requireNullableString,
   expectRecord,
+  requireBoolean,
   requireNumber,
   requireOneOf,
   requireString,
@@ -23,6 +26,30 @@ const orderStatuses = [
   "disputed",
 ] as const satisfies readonly OrderStatus[]
 
+function nullableString(
+  record: Record<string, unknown>,
+  key: string,
+  label: string,
+): string | null {
+  const value = record[key]
+  if (value === undefined || value === null) return null
+  if (typeof value !== "string") {
+    throw new Error(
+      `Invalid API response: ${label}.${key} must be a string or null.`,
+    )
+  }
+  return value
+}
+
+function numberFrom(
+  record: Record<string, unknown>,
+  primary: string,
+  fallback: string,
+  label: string,
+): number {
+  return requireNumber(record, primary in record ? primary : fallback, label)
+}
+
 export async function getOrderDetail(
   orderId: string,
 ): Promise<OrderDetailResponse> {
@@ -32,24 +59,58 @@ export async function getOrderDetail(
     ),
     "order",
   )
-  const totalKey = "total" in order ? "total" : "amount"
-  const unitPriceKey = "unitPrice" in order ? "unitPrice" : "price"
+  const quantity = requireNumber(order, "quantity", "order")
+  if (quantity <= 0) {
+    throw new Error("Invalid API response: order.quantity must be positive.")
+  }
+  const totalKey = ["totalAmount", "total", "amount"].find(
+    (key) => key in order,
+  )
+  if (!totalKey) {
+    throw new Error(
+      "Invalid API response: order must include totalAmount or total.",
+    )
+  }
+  const total = requireNumber(order, totalKey, "order")
+  const manualDelivery = requireBoolean(order, "manualDelivery", "order")
   return {
     id: requireString(order, "id", "order"),
+    buyerId: nullableString(order, "buyerId", "order"),
+    sellerId: requireString(order, "sellerId", "order"),
+    listingId: requireString(order, "listingId", "order"),
     eventTitle: asString(order.eventTitle ?? order.title, "Order"),
     eventDate: asString(order.eventDate ?? order.createdAt ?? order.date),
     venue: asString(order.venue),
     section: asString(order.section),
     row: asString(order.row),
     seats: asString(order.seats),
-    quantity: requireNumber(order, "quantity", "order"),
-    unitPrice: requireNumber(order, unitPriceKey, "order"),
-    subtotal: requireNumber(order, "subtotal", "order"),
-    fees: requireNumber(order, "fees", "order"),
-    total: requireNumber(order, totalKey, "order"),
+    quantity,
+    unitPrice:
+      "unitPrice" in order || "price" in order
+        ? numberFrom(order, "unitPrice", "price", "order")
+        : total / quantity,
+    subtotal:
+      order.subtotal === undefined
+        ? total
+        : requireNumber(order, "subtotal", "order"),
+    fees: order.fees === undefined ? 0 : requireNumber(order, "fees", "order"),
+    total,
     status: requireOneOf(order, "status", orderStatuses, "order"),
-    deliveryMethod: asString(order.deliveryMethod, "Instant e-ticket"),
+    deliveryMethod: manualDelivery
+      ? "Manual ticket delivery"
+      : asString(order.deliveryMethod, "Instant e-ticket"),
     createdAt: asString(order.createdAt),
+    manualDelivery,
+    manualDeliverySubmittedAt: nullableString(
+      order,
+      "manualDeliverySubmittedAt",
+      "order",
+    ),
+    manualDeliveryAcceptedAt: nullableString(
+      order,
+      "manualDeliveryAcceptedAt",
+      "order",
+    ),
   }
 }
 
@@ -58,11 +119,8 @@ export async function submitCheckout(
   idempotencyKey = createIdempotencyKey(),
 ): Promise<CheckoutResponse> {
   const headers = new Headers({ "idempotency-key": idempotencyKey })
-  const accessToken =
-    typeof window === "undefined"
-      ? ""
-      : window.localStorage.getItem("restub_access_token")
-  if (!accessToken) headers.set("x-device-id", getDeviceId())
+  const deviceId = getDeviceId()
+  if (deviceId) headers.set("x-device-id", deviceId)
 
   const result = await authenticatedRequest<unknown>("/orders/checkout", {
     method: "POST",
@@ -87,17 +145,29 @@ export async function submitCheckout(
   })
   const checkout = expectRecord(result, "checkout response")
   const order = expectRecord(checkout.order, "checkout response order")
+  const buyerId = nullableString(order, "buyerId", "checkout response order")
   const checkoutOrder = {
     id: requireString(order, "id", "checkout response order"),
-    buyerId: requireString(order, "buyerId", "checkout response order"),
-    buyerEmail: requireNullableString(
-      order,
-      "buyerEmail",
-      "checkout response order",
-    ),
+    buyerId,
+    buyerEmail: nullableString(order, "buyerEmail", "checkout response order"),
     sellerId: requireString(order, "sellerId", "checkout response order"),
     listingId: requireString(order, "listingId", "checkout response order"),
     quantity: requireNumber(order, "quantity", "checkout response order"),
+    manualDelivery: requireBoolean(
+      order,
+      "manualDelivery",
+      "checkout response order",
+    ),
+    manualDeliverySubmittedAt: nullableString(
+      order,
+      "manualDeliverySubmittedAt",
+      "checkout response order",
+    ),
+    manualDeliveryAcceptedAt: nullableString(
+      order,
+      "manualDeliveryAcceptedAt",
+      "checkout response order",
+    ),
     totalAmount: requireNumber(order, "totalAmount", "checkout response order"),
     status: requireOneOf(
       order,
@@ -107,57 +177,32 @@ export async function submitCheckout(
     ),
     createdAt: requireString(order, "createdAt", "checkout response order"),
     updatedAt: requireString(order, "updatedAt", "checkout response order"),
-    deleted: requireBoolean(order, "deleted", "checkout response order"),
   }
-  let payment: CheckoutResponse["payment"]
-  if (checkout.payment !== undefined && checkout.payment !== null) {
-    const record = expectRecord(checkout.payment, "checkout response payment")
-    const paymentStatuses = [
-      "pending",
-      "authorized",
-      "captured",
-      "failed",
-      "refunded",
-      "settled",
-    ] as const
-    payment = {
-      id: requireString(record, "id", "checkout response payment"),
-      orderId: requireString(record, "orderId", "checkout response payment"),
-      buyerId: requireString(record, "buyerId", "checkout response payment"),
-      sellerId: requireString(record, "sellerId", "checkout response payment"),
-      amount: requireNumber(record, "amount", "checkout response payment"),
-      currency: requireString(record, "currency", "checkout response payment"),
-      provider: requireString(record, "provider", "checkout response payment"),
-      providerReference: requireNullableString(
+  let transaction: CheckoutResponse["transaction"]
+  if (checkout.transaction !== undefined && checkout.transaction !== null) {
+    const record = expectRecord(
+      checkout.transaction,
+      "checkout response transaction",
+    )
+    transaction = {
+      id: requireString(record, "id", "checkout response transaction"),
+      provider: requireString(
+        record,
+        "provider",
+        "checkout response transaction",
+      ),
+      providerReference: requireString(
         record,
         "providerReference",
-        "checkout response payment",
+        "checkout response transaction",
       ),
-      status: requireOneOf(
+      amount: requireNumber(record, "amount", "checkout response transaction"),
+      currency: requireString(
         record,
-        "status",
-        paymentStatuses,
-        "checkout response payment",
+        "currency",
+        "checkout response transaction",
       ),
-      createdAt: requireString(
-        record,
-        "createdAt",
-        "checkout response payment",
-      ),
-      updatedAt: requireString(
-        record,
-        "updatedAt",
-        "checkout response payment",
-      ),
-      ...(record.authorizationUrl === undefined ||
-      record.authorizationUrl === null ||
-      typeof record.authorizationUrl === "string"
-        ? { authorizationUrl: record.authorizationUrl }
-        : (() => {
-            throw new Error(
-              "Invalid API response: payment.authorizationUrl must be a string or null.",
-            )
-          })()),
+      status: requireString(record, "status", "checkout response transaction"),
     }
   }
   const checkoutUrl = checkout.checkoutUrl
@@ -171,7 +216,7 @@ export async function submitCheckout(
     )
   }
   let verification: CheckoutResponse["verification"]
-  if (checkout.verification !== undefined) {
+  if (checkout.verification !== undefined && checkout.verification !== null) {
     const record = expectRecord(
       checkout.verification,
       "checkout response verification",
@@ -192,8 +237,109 @@ export async function submitCheckout(
   }
   return {
     order: checkoutOrder,
-    ...(payment ? { payment } : {}),
+    ...(transaction ? { transaction } : {}),
     ...(checkoutUrl !== undefined ? { checkoutUrl } : {}),
     ...(verification ? { verification } : {}),
   }
+}
+
+export async function getEscrowOperationStatus(
+  orderId: string,
+): Promise<EscrowOperationStatus> {
+  const status = expectRecord(
+    await authenticatedRequest<unknown>(
+      `/payments/escrow/${encodeURIComponent(orderId)}/status`,
+    ),
+    "escrow operation status",
+  )
+  const escrowStatus = requireOneOf(
+    status,
+    "escrowStatus",
+    [
+      "hold",
+      "release_pending",
+      "released",
+      "refund_pending",
+      "refunded",
+      "disputed",
+    ] as const,
+    "escrow operation status",
+  )
+  return {
+    orderId: requireString(status, "orderId", "escrow operation status"),
+    escrowStatus,
+    releaseStatus: nullableString(
+      status,
+      "releaseStatus",
+      "escrow operation status",
+    ),
+    refundStatus: nullableString(
+      status,
+      "refundStatus",
+      "escrow operation status",
+    ),
+  }
+}
+
+export async function acceptOrderDelivery(orderId: string): Promise<void> {
+  await authenticatedRequest<unknown>(
+    `/orders/${encodeURIComponent(orderId)}/delivery/accept`,
+    { method: "POST" },
+  )
+}
+
+export async function getOrderDelivery(
+  orderId: string,
+): Promise<OrderDeliveryResponse> {
+  const result = expectRecord(
+    await authenticatedRequest<unknown>(
+      `/orders/${encodeURIComponent(orderId)}/delivery`,
+    ),
+    "order delivery",
+  )
+  return {
+    orderId: requireString(result, "orderId", "order delivery"),
+    tickets: Array.isArray(result.tickets)
+      ? result.tickets.map((item) => {
+          const ticket = expectRecord(item, "delivered ticket")
+          const url = requireString(ticket, "url", "delivered ticket")
+          let downloadUrl: URL
+          try {
+            downloadUrl = new URL(url)
+          } catch {
+            throw new Error(
+              "Invalid API response: delivered ticket.url must be a URL.",
+            )
+          }
+          if (downloadUrl.protocol !== "https:") {
+            throw new Error(
+              "Invalid API response: delivered ticket.url must use HTTPS.",
+            )
+          }
+          return {
+            slotIndex: requireNumber(ticket, "slotIndex", "delivered ticket"),
+            mimeType: requireString(ticket, "mimeType", "delivered ticket"),
+            url: downloadUrl.toString(),
+            expiresAt: requireString(ticket, "expiresAt", "delivered ticket"),
+          }
+        })
+      : (() => {
+          throw new Error(
+            "Invalid API response: order delivery.tickets must be an array.",
+          )
+        })(),
+  }
+}
+
+export async function releaseOrderEscrow(
+  orderId: string,
+  idempotencyKey = createIdempotencyKey(),
+): Promise<void> {
+  await authenticatedRequest<unknown>(
+    `/payments/escrow/${encodeURIComponent(orderId)}/release`,
+    {
+      method: "POST",
+      headers: { "idempotency-key": idempotencyKey },
+    },
+  )
 }
