@@ -54,7 +54,7 @@ export default function AccountListingDetailsPage() {
       ) : (
         <ResourceCard>
           <Link
-            href="/account"
+            href="/account/my-listings"
             className="text-[13px] underline underline-offset-2"
             style={{ color: "#111111" }}
           >

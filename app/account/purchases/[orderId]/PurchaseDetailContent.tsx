@@ -12,21 +12,38 @@ import {
   useGetOrderDeliveryQuery,
   useGetOrderDetailQuery,
   useReleaseOrderEscrowMutation,
+  useDeliverManualOrderTicketMutation,
 } from "../../../lib/orders/rtk"
+import { useOpenDisputeMutation } from "../../../lib/disputes/rtk"
+import { getSupportMailto } from "../../../lib/support"
 
 export default function PurchaseDetailContent({
   orderId,
 }: {
   orderId: string
 }) {
-  const { data: order, isLoading, error } = useGetOrderDetailQuery(orderId)
+  const {
+    data: order,
+    isLoading,
+    error,
+    refetch: refetchOrder,
+  } = useGetOrderDetailQuery(orderId)
   const { user } = useAuth()
   const [acceptDelivery, { isLoading: accepting }] =
     useAcceptOrderDeliveryMutation()
   const [releaseEscrow, { isLoading: releasing }] =
     useReleaseOrderEscrowMutation()
+  const [deliverTicket] = useDeliverManualOrderTicketMutation()
+  const [openDispute, { isLoading: openingDispute }] =
+    useOpenDisputeMutation()
   const [actionError, setActionError] = useState("")
   const [actionMessage, setActionMessage] = useState("")
+  const [disputeReason, setDisputeReason] = useState("")
+  const [showDisputeForm, setShowDisputeForm] = useState(false)
+  const [disputeError, setDisputeError] = useState("")
+  const [disputeMessage, setDisputeMessage] = useState("")
+  const [deliveryFiles, setDeliveryFiles] = useState<Record<number, File>>({})
+  const [uploadingSlot, setUploadingSlot] = useState<number | null>(null)
   const canCheckEscrow =
     order?.status === "paid" || order?.status === "fulfilled"
   const {
@@ -47,6 +64,8 @@ export default function PurchaseDetailContent({
   )
   const isBuyer = Boolean(order && user?.id === order.buyerId)
   const isSeller = Boolean(order && user?.id === order.sellerId)
+  const canOpenDispute =
+    isBuyer && (order?.status === "paid" || order?.status === "fulfilled")
   const { data: delivery, error: deliveryError } = useGetOrderDeliveryQuery(
     orderId,
     {
@@ -217,8 +236,16 @@ export default function PurchaseDetailContent({
                 {order.manualDeliveryAcceptedAt
                   ? `Delivery accepted ${new Date(order.manualDeliveryAcceptedAt).toLocaleString()}.`
                   : order.manualDeliverySubmittedAt
-                    ? "The seller submitted the tickets. Review the files and accept delivery when satisfied."
+                    ? delivery?.tickets.length === order.quantity
+                      ? "Your tickets are ready to download below. Review the files and accept delivery when satisfied."
+                      : "The seller submitted the tickets. Secure download links are being prepared."
                     : "Waiting for the seller to deliver the tickets."}
+              </p>
+            )}
+            {isBuyer && !order.manualDelivery && canCheckEscrow && (
+              <p className="text-[13px] mt-2" style={{ color: "#292B2F" }}>
+                This order uses email delivery. Check the inbox for the address
+                used at checkout, including its spam folder, for your ticket.
               </p>
             )}
             {canCheckEscrow && (
@@ -262,6 +289,107 @@ export default function PurchaseDetailContent({
                 Download ticket {ticket.slotIndex}
               </a>
             ))}
+            {isSeller &&
+              order.manualDelivery &&
+              order.status === "paid" &&
+              !order.manualDeliverySubmittedAt && (
+                <div className="mt-5 border-t border-[#E8E9EB] pt-4">
+                  <h3 className="text-[14px] font-semibold text-[#111111]">
+                    Deliver tickets
+                  </h3>
+                  <p className="mt-1 text-[12px] text-[#292B2F]">
+                    Upload a PDF, JPEG, or PNG for each ticket. Files must be 5
+                    MB or smaller. The buyer can access them after every ticket
+                    is delivered.
+                  </p>
+                  <div className="mt-3 space-y-3">
+                    {Array.from(
+                      { length: order.quantity },
+                      (_, index) => index + 1,
+                    ).map((slot) => {
+                      const delivered = order.ticketDeliveries.some(
+                        (item) => item.slotIndex === slot && item.deliveredAt,
+                      )
+                      return (
+                        <div
+                          key={slot}
+                          className="flex flex-col gap-3 rounded-lg border border-[#E8E9EB] p-3 sm:flex-row sm:items-center sm:justify-between"
+                        >
+                          <div>
+                            <p className="text-[12px] font-medium text-[#111111]">
+                              Ticket {slot}
+                            </p>
+                            {delivered ? (
+                              <p className="mt-1 text-[11px] text-[#292B2F]">
+                                Delivered
+                              </p>
+                            ) : (
+                              <input
+                                type="file"
+                                accept="application/pdf,image/jpeg,image/png"
+                                aria-label={`Choose ticket ${slot} file`}
+                                onChange={(event) => {
+                                  const file = event.currentTarget.files?.[0]
+                                  setDeliveryFiles((current) => {
+                                    const next = { ...current }
+                                    if (file) next[slot] = file
+                                    else delete next[slot]
+                                    return next
+                                  })
+                                }}
+                                className="mt-1 block max-w-full text-[11px] text-[#292B2F]"
+                              />
+                            )}
+                          </div>
+                          {!delivered ? (
+                            <button
+                              type="button"
+                              disabled={
+                                !deliveryFiles[slot] || uploadingSlot !== null
+                              }
+                              onClick={async () => {
+                                const file = deliveryFiles[slot]
+                                if (!file) return
+                                setActionError("")
+                                setActionMessage("")
+                                setUploadingSlot(slot)
+                                try {
+                                  await deliverTicket({
+                                    orderId: order.id,
+                                    slotIndex: slot,
+                                    file,
+                                  }).unwrap()
+                                  setDeliveryFiles((current) => {
+                                    const next = { ...current }
+                                    delete next[slot]
+                                    return next
+                                  })
+                                  await refetchOrder()
+                                  setActionMessage(`Ticket ${slot} delivered.`)
+                                } catch (reason) {
+                                  setActionError(
+                                    getApiErrorMessage(
+                                      reason,
+                                      `Unable to deliver ticket ${slot}.`,
+                                    ),
+                                  )
+                                } finally {
+                                  setUploadingSlot(null)
+                                }
+                              }}
+                              className="shrink-0 rounded-lg bg-[#111111] px-4 py-2.5 text-[12px] font-semibold text-[#FAFAF7] disabled:opacity-50"
+                            >
+                              {uploadingSlot === slot
+                                ? "Uploading…"
+                                : "Upload ticket"}
+                            </button>
+                          ) : null}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
             {actionError && (
               <p role="alert" className="text-[13px] text-red-800 mt-3">
                 {actionError}
@@ -334,6 +462,139 @@ export default function PurchaseDetailContent({
                   </button>
                 )}
             </div>
+          </section>
+        )}
+        {isBuyer && (
+          <section
+            className="mt-6 bg-white border rounded-lg p-6"
+            style={{ borderColor: "#E8E9EB" }}
+          >
+            <h2
+              className="text-[16px] font-semibold"
+              style={{ color: "#111111" }}
+            >
+              Problem with your ticket?
+            </h2>
+            {order.status === "disputed" ? (
+              <p className="mt-2 text-[13px]" style={{ color: "#292B2F" }}>
+                A dispute is already open for this order. Our team will review
+                it and follow up by email.
+              </p>
+            ) : canOpenDispute ? (
+              <>
+                <p className="mt-2 text-[13px]" style={{ color: "#292B2F" }}>
+                  Report a missing, incorrect, or unusable ticket. Opening a
+                  dispute pauses order settlement while our team reviews it.
+                </p>
+                {!showDisputeForm ? (
+                  <button
+                    type="button"
+                    onClick={() => setShowDisputeForm(true)}
+                    className="mt-4 rounded-lg border px-4 py-2.5 text-[13px] font-semibold"
+                    style={{ borderColor: "#E8E9EB", color: "#111111" }}
+                  >
+                    Report a ticket problem
+                  </button>
+                ) : (
+                  <form
+                    className="mt-4 space-y-3"
+                    onSubmit={async (event) => {
+                      event.preventDefault()
+                      setDisputeError("")
+                      setDisputeMessage("")
+                      try {
+                        const dispute = await openDispute({
+                          orderId: order.id,
+                          reason: disputeReason.trim(),
+                        }).unwrap()
+                        setShowDisputeForm(false)
+                        setDisputeReason("")
+                        setDisputeMessage(
+                          `Your report was submitted. Reference: ${dispute.id}`,
+                        )
+                      } catch (reason) {
+                        setDisputeError(
+                          getApiErrorMessage(
+                            reason,
+                            "Unable to submit your ticket problem.",
+                          ),
+                        )
+                      }
+                    }}
+                  >
+                    <label className="block text-[12px] font-medium text-[#111111]">
+                      What went wrong?
+                      <textarea
+                        required
+                        minLength={1}
+                        maxLength={2000}
+                        value={disputeReason}
+                        onChange={(event) =>
+                          setDisputeReason(event.target.value)
+                        }
+                        rows={4}
+                        className="mt-1.5 w-full resize-y rounded-lg border px-3 py-2.5 text-[13px]"
+                        style={{
+                          borderColor: "#E8E9EB",
+                          backgroundColor: "#FAFAF7",
+                        }}
+                      />
+                    </label>
+                    <div className="flex flex-wrap gap-3">
+                      <button
+                        type="submit"
+                        disabled={openingDispute || !disputeReason.trim()}
+                        className="rounded-lg px-4 py-2.5 text-[13px] font-semibold disabled:opacity-60"
+                        style={{
+                          backgroundColor: "#111111",
+                          color: "#FAFAF7",
+                        }}
+                      >
+                        {openingDispute ? "Submitting…" : "Submit report"}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={openingDispute}
+                        onClick={() => {
+                          setShowDisputeForm(false)
+                          setDisputeReason("")
+                          setDisputeError("")
+                        }}
+                        className="rounded-lg border px-4 py-2.5 text-[13px] font-semibold disabled:opacity-60"
+                        style={{ borderColor: "#E8E9EB", color: "#111111" }}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </form>
+                )}
+              </>
+            ) : (
+              <p className="mt-2 text-[13px]" style={{ color: "#292B2F" }}>
+                Ticket problems can be reported after payment is confirmed.
+                Check the order status and your email for updates.
+              </p>
+            )}
+            {disputeError && (
+              <p role="alert" className="mt-3 text-[13px] text-red-800">
+                {disputeError}
+              </p>
+            )}
+            {disputeMessage && (
+              <p role="status" className="mt-3 text-[13px] text-green-800">
+                {disputeMessage}
+              </p>
+            )}
+            <p className="mt-4 text-[13px]" style={{ color: "#292B2F" }}>
+              Prefer email?{" "}
+              <a
+                href={getSupportMailto(order.id)}
+                className="font-semibold underline underline-offset-2 text-[#111111]"
+              >
+                Contact buyer support
+              </a>
+              .
+            </p>
           </section>
         )}
       </main>

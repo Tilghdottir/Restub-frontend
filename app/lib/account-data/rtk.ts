@@ -1,5 +1,6 @@
 import {
   getNotifications,
+  getDashboardTickets,
   getPayments,
   getTickets,
   requestRefund,
@@ -12,6 +13,11 @@ const accountDataApi = rtkApi.injectEndpoints({
       queryFn: () => runQuery(() => getTickets()),
       providesTags: ["Tickets"],
     }),
+    getDashboardTickets:
+      builder.query<Awaited<ReturnType<typeof getDashboardTickets>>, void>({
+        queryFn: () => runQuery(() => getDashboardTickets()),
+        providesTags: ["Tickets", "Listings", "Order"],
+      }),
     getPayments:
       builder.query<Awaited<ReturnType<typeof getPayments>>, string | undefined>(
         {
@@ -37,6 +43,7 @@ const accountDataApi = rtkApi.injectEndpoints({
 
 export const {
   useGetTicketsQuery,
+  useGetDashboardTicketsQuery,
   useGetPaymentsQuery,
   useGetNotificationsQuery,
   useLazyGetPaymentsQuery,

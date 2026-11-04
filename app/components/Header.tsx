@@ -47,6 +47,13 @@ export default function Header() {
           >
             Sell Tickets
           </Link>
+          <Link
+            href="/refund"
+            className="text-sm font-medium transition-colors hover:opacity-70"
+            style={{ color: "#292B2F" }}
+          >
+            Help
+          </Link>
           {isAuthenticated ? (
             <>
               <Link
@@ -54,16 +61,68 @@ export default function Header() {
                 className="text-sm font-medium transition-colors hover:opacity-70"
                 style={{ color: "#292B2F" }}
               >
-                My Account
+                Dashboard
               </Link>
-              <button
-                type="button"
-                onClick={handleSignOut}
+              <Link
+                href="/account#tickets-heading"
                 className="text-sm font-medium transition-colors hover:opacity-70"
                 style={{ color: "#292B2F" }}
               >
-                Sign Out
-              </button>
+                My tickets
+              </Link>
+              <Link
+                href="/order"
+                className="text-sm font-medium transition-colors hover:opacity-70"
+                style={{ color: "#292B2F" }}
+              >
+                Orders
+              </Link>
+              <details className="py-1">
+                <summary className="cursor-pointer text-sm font-medium text-[#292B2F]">
+                  Money
+                </summary>
+                <nav className="ml-3 mt-2 flex flex-col gap-2">
+                  {[
+                    ["Transactions", "/transaction"],
+                    ["Payout settings", "/payout-account"],
+                  ].map(([label, href]) => (
+                    <Link
+                      key={href}
+                      href={href}
+                      className="text-sm text-[#292B2F]"
+                    >
+                      {label}
+                    </Link>
+                  ))}
+                </nav>
+              </details>
+              <details className="py-1">
+                <summary className="cursor-pointer text-sm font-medium text-[#292B2F]">
+                  Profile
+                </summary>
+                <nav className="ml-3 mt-2 flex flex-col gap-2">
+                  {[
+                    ["Notifications", "/notification"],
+                    ["Payment methods", "/payment"],
+                    ["Identity verification", "/account/kyc"],
+                  ].map(([label, href]) => (
+                    <Link
+                      key={href}
+                      href={href}
+                      className="text-sm text-[#292B2F]"
+                    >
+                      {label}
+                    </Link>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={handleSignOut}
+                    className="text-left text-sm font-medium text-[#292B2F]"
+                  >
+                    Sign Out
+                  </button>
+                </nav>
+              </details>
             </>
           ) : (
             <>
@@ -101,7 +160,7 @@ export default function Header() {
       </div>
       {menuOpen && (
         <div
-          className="md:hidden bg-white border-t px-6 py-4 flex flex-col gap-3"
+          className="md:hidden max-h-[80vh] overflow-y-auto bg-white border-t px-6 py-4 flex flex-col gap-3"
           style={{ borderColor: "#E8E9EB" }}
         >
           <Link
@@ -114,21 +173,93 @@ export default function Header() {
           {isAuthenticated ? (
             <>
               <Link
+                href="/sell"
+                className="text-sm font-medium py-1"
+                style={{ color: "#292B2F" }}
+                onClick={() => setMenuOpen(false)}
+              >
+                List tickets
+              </Link>
+              <Link
+                href="/refund"
+                className="text-sm font-medium py-1"
+                style={{ color: "#292B2F" }}
+                onClick={() => setMenuOpen(false)}
+              >
+                Help
+              </Link>
+              <Link
                 href="/account"
                 className="text-sm font-medium py-1"
                 style={{ color: "#292B2F" }}
                 onClick={() => setMenuOpen(false)}
               >
-                My Account
+                Dashboard
               </Link>
-              <button
-                type="button"
-                onClick={handleSignOut}
-                className="text-left text-sm font-semibold py-1"
-                style={{ color: "#111111" }}
+              <Link
+                href="/account#tickets-heading"
+                className="text-sm font-medium py-1"
+                style={{ color: "#292B2F" }}
+                onClick={() => setMenuOpen(false)}
               >
-                Sign Out
-              </button>
+                My tickets
+              </Link>
+              <Link
+                href="/order"
+                className="text-sm font-medium py-1"
+                style={{ color: "#292B2F" }}
+                onClick={() => setMenuOpen(false)}
+              >
+                Orders
+              </Link>
+              <details className="py-1">
+                <summary className="cursor-pointer text-sm font-medium text-[#292B2F]">
+                  Money
+                </summary>
+                <nav className="ml-3 mt-2 flex flex-col gap-2">
+                  {[
+                    ["Transactions", "/transaction"],
+                    ["Payout settings", "/payout-account"],
+                  ].map(([label, href]) => (
+                    <Link
+                      key={href}
+                      href={href}
+                      className="text-sm text-[#292B2F]"
+                      onClick={() => setMenuOpen(false)}
+                    >
+                      {label}
+                    </Link>
+                  ))}
+                </nav>
+              </details>
+              <details className="py-1">
+                <summary className="cursor-pointer text-sm font-medium text-[#292B2F]">
+                  Profile
+                </summary>
+                <nav className="ml-3 mt-2 flex flex-col gap-2">
+                  {[
+                    ["Notifications", "/notification"],
+                    ["Payment methods", "/payment"],
+                    ["Identity verification", "/account/kyc"],
+                  ].map(([label, href]) => (
+                    <Link
+                      key={href}
+                      href={href}
+                      className="text-sm text-[#292B2F]"
+                      onClick={() => setMenuOpen(false)}
+                    >
+                      {label}
+                    </Link>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={handleSignOut}
+                    className="text-left text-sm font-medium text-[#292B2F]"
+                  >
+                    Sign Out
+                  </button>
+                </nav>
+              </details>
             </>
           ) : (
             <>

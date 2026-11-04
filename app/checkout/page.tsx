@@ -340,6 +340,28 @@ function CheckoutPageContent() {
     )
   }
 
+  if (listing.status !== "published" || listing.quantity < 1) {
+    return (
+      <div className="min-h-screen bg-[#FAFAF7]">
+        <Header />
+        <main className="max-w-xl mx-auto px-6 py-16 text-center">
+          <h1 className="text-2xl font-bold text-[#111111]">
+            This listing is no longer available
+          </h1>
+          <p className="mt-3 text-[14px] text-[#292B2F]">
+            Choose another listing to continue.
+          </p>
+          <Link
+            href="/"
+            className="mt-5 inline-block text-[13px] underline text-[#111111]"
+          >
+            Browse listings
+          </Link>
+        </main>
+      </div>
+    )
+  }
+
   const orderRef = `RC-${Math.random().toString(36).slice(2, 8).toUpperCase()}`
 
   return (

@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { useEffect, useState } from "react"
 import Header from "../../components/Header"
+import { getSupportMailto } from "../../lib/support"
 
 export default function CheckoutCancelPage() {
   const [orderId, setOrderId] = useState("")
@@ -57,6 +58,13 @@ export default function CheckoutCancelPage() {
             >
               Continue browsing
             </Link>
+            <a
+              href={getSupportMailto(orderId)}
+              className="inline-flex items-center justify-center rounded-lg border px-5 py-3 text-[14px] font-semibold"
+              style={{ borderColor: "#E8E9EB", color: "#111111" }}
+            >
+              Contact support
+            </a>
           </div>
         </div>
       </main>

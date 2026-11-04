@@ -46,6 +46,31 @@ export async function getDisputes(
   }
 }
 
+export async function openDispute(
+  orderId: string,
+  reason: string,
+): Promise<{ id: string }> {
+  const result = expectRecord(
+    await authenticatedRequest<unknown>("/disputes", {
+      method: "POST",
+      body: JSON.stringify({ orderId, reason }),
+    }),
+    "opened dispute",
+  )
+  if (requireString(result, "orderId", "opened dispute") !== orderId) {
+    throw new Error(
+      "Invalid API response: opened dispute order id does not match the requested order.",
+    )
+  }
+  requireOneOf(
+    result,
+    "status",
+    DISPUTE_STATUSES,
+    "opened dispute",
+  )
+  return { id: requireString(result, "id", "opened dispute") }
+}
+
 export async function getDisputeDetail(id: string): Promise<DisputeDetail> {
   return parseDisputeDetail(
     await authenticatedRequest<unknown>(`/disputes/${encodeURIComponent(id)}`),

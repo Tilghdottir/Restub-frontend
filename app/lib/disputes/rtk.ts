@@ -5,12 +5,24 @@ import {
   getDisputeDetail,
   getDisputeEvidence,
   getDisputes,
+  openDispute,
   resolveDispute,
 } from "./client"
 import type { DisputeOutcome, DisputeStatus } from "./types"
 
 const disputesApi = rtkApi.injectEndpoints({
   endpoints: (builder) => ({
+    openDispute: builder.mutation<
+      Awaited<ReturnType<typeof openDispute>>,
+      { orderId: string; reason: string }
+    >({
+      queryFn: ({ orderId, reason }) =>
+        runQuery(() => openDispute(orderId, reason)),
+      invalidatesTags: (_result, _error, { orderId }) => [
+        { type: "Order", id: orderId },
+        "Disputes",
+      ],
+    }),
     getDisputes: builder.query<Awaited<ReturnType<typeof getDisputes>>, {
       limit?: number
       cursor?: string
@@ -60,6 +72,7 @@ const disputesApi = rtkApi.injectEndpoints({
 })
 
 export const {
+  useOpenDisputeMutation,
   useGetDisputesQuery,
   useGetDisputeDetailQuery,
   useGetDisputeEvidenceQuery,

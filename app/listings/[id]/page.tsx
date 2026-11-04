@@ -48,6 +48,7 @@ export default async function ListingDetailsPage({ params }: Props) {
   }
 
   const checkoutHref = `/checkout/${encodeURIComponent(listing.id)}`
+  const isAvailable = listing.status === "published" && listing.quantity > 0
   const ticketType = listing.ticketType ?? "general_admission"
   const ticketDetails = listing.ticketDetails
   const isPackage = isTicketPackage(ticketType)
@@ -138,13 +139,19 @@ export default async function ListingDetailsPage({ params }: Props) {
               <p className="mt-1 font-semibold">{listing.status}</p>
             </div>
           </div>
-          <Link
-            href={checkoutHref}
-            className="mt-7 inline-flex rounded-lg px-5 py-3 text-[14px] font-semibold"
-            style={{ backgroundColor: "#111111", color: "#FAFAF7" }}
-          >
-            Buy this listing
-          </Link>
+          {isAvailable ? (
+            <Link
+              href={checkoutHref}
+              className="mt-7 inline-flex rounded-lg px-5 py-3 text-[14px] font-semibold"
+              style={{ backgroundColor: "#111111", color: "#FAFAF7" }}
+            >
+              Buy this listing
+            </Link>
+          ) : (
+            <p className="mt-7 text-[13px] font-medium text-[#67696D]">
+              This listing is no longer available.
+            </p>
+          )}
         </div>
       </main>
     </div>

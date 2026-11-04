@@ -5,10 +5,12 @@ import { ProtectedRoute } from "./ProtectedRoute"
 export default function AccountPageShell({
   eyebrow,
   title,
+  headerAction,
   children,
 }: {
   eyebrow: string
   title: string
+  headerAction?: ReactNode
   children: ReactNode
 }) {
   return (
@@ -16,16 +18,19 @@ export default function AccountPageShell({
       <div className="min-h-screen" style={{ backgroundColor: "#FAFAF7" }}>
         <AccountSidebar />
         <main className="lg:ml-64 max-w-5xl mx-auto px-6 py-8">
-          <div className="mb-6">
-            <p
-              className="text-[11px] font-medium tracking-widest uppercase mb-2"
-              style={{ color: "#292B2F" }}
-            >
-              {eyebrow}
-            </p>
-            <h1 className="text-3xl font-bold" style={{ color: "#111111" }}>
-              {title}
-            </h1>
+          <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <p
+                className="text-[11px] font-medium tracking-widest uppercase mb-2"
+                style={{ color: "#292B2F" }}
+              >
+                {eyebrow}
+              </p>
+              <h1 className="text-3xl font-bold" style={{ color: "#111111" }}>
+                {title}
+              </h1>
+            </div>
+            {headerAction}
           </div>
           {children}
         </main>

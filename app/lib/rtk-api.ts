@@ -75,6 +75,7 @@ export const rtkApi = createApi({
     "Events",
     "PaymentMethods",
     "Transactions",
+    "SellerEarnings",
     "Notifications",
     "Refunds",
     "AdminSummary",

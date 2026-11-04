@@ -32,7 +32,11 @@ export default function NotificationPage() {
                     {notification.title}
                   </p>
                   <span className="text-[11px]" style={{ color: "#292B2F" }}>
-                    {notification.createdAt}
+                    <time dateTime={notification.createdAt}>
+                      {new Intl.DateTimeFormat("en-NG", {
+                        dateStyle: "medium",
+                      }).format(new Date(notification.createdAt))}
+                    </time>
                   </span>
                 </div>
                 <p className="text-[13px] mt-1" style={{ color: "#292B2F" }}>

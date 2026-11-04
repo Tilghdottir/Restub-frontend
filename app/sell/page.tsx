@@ -1028,7 +1028,7 @@ export default function SellPage() {
             className="text-[11px] font-medium tracking-widest uppercase mb-2"
             style={{ color: "#292B2F" }}
           >
-            Seller dashboard
+            My account
           </p>
           <h1 className="text-3xl font-bold" style={{ color: "#111111" }}>
             List your tickets

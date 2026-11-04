@@ -31,6 +31,41 @@ export type OrderDetailResponse = {
   manualDelivery: boolean
   manualDeliverySubmittedAt: string | null
   manualDeliveryAcceptedAt: string | null
+  ticketDetails: {
+    section: string
+    row: string
+    seatNumbers: string
+  }
+  ticketDeliveries: Array<{
+    slotIndex: number
+    mimeType: string
+    expectedBytes: number
+    deliveredAt: string | null
+  }>
+}
+
+export type SellerOrderSummary = {
+  id: string
+  sellerId: string
+  listingId: string
+  listingTitle: string
+  quantity: number
+  totalAmount: number
+  status: "verification_pending" | "pending" | "paid" | "fulfilled" | "cancelled" | "disputed"
+  manualDelivery: boolean
+  manualDeliverySubmittedAt: string | null
+  manualDeliveryAcceptedAt: string | null
+  escrowStatus: "hold" | "release_pending" | "released" | "refund_pending" | "refunded" | "disputed" | null
+  createdAt: string
+}
+
+export type CreateOrderDeliveryUploadResponse = {
+  deliveryId: string
+  slotIndex: number
+  method: "POST"
+  url: string
+  fields: Record<string, string>
+  uploadMode: "direct" | "api"
 }
 
 export type EscrowOperationStatus = {

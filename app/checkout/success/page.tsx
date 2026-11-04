@@ -5,6 +5,7 @@ import { useEffect, useState } from "react"
 import Header from "../../components/Header"
 import { useAuth } from "../../hooks/useAuth"
 import { useLazyGetOrderDetailQuery } from "../../lib/orders/rtk"
+import { getSupportMailto } from "../../lib/support"
 
 type PaymentResult = "checking" | "confirmed" | "pending" | "cancelled" | "error"
 
@@ -137,6 +138,13 @@ export default function CheckoutSuccessPage() {
             >
               Continue browsing
             </Link>
+            <a
+              href={getSupportMailto(orderId)}
+              className="inline-flex items-center justify-center rounded-lg border px-5 py-3 text-[14px] font-semibold"
+              style={{ borderColor: "#E8E9EB", color: "#111111" }}
+            >
+              Contact support
+            </a>
           </div>
         </div>
       </main>
