@@ -116,6 +116,9 @@ export default function AccountPage() {
   const hasSellingActivity = tickets.some(
     (ticket) => ticket.relationship === "seller",
   )
+  const sellerOrders = tickets.filter(
+    (ticket) => ticket.relationship === "seller" && ticket.orderId !== null,
+  )
   const {
     data: earnings,
     error: earningsError,
@@ -186,12 +189,20 @@ export default function AccountPage() {
       eyebrow="Your tickets and money"
       title="My account"
       headerAction={
-        <Link
-          href="/sell"
-          className="rounded-lg bg-[#111111] px-4 py-2.5 text-[12px] font-semibold text-[#FAFAF7]"
-        >
-          List tickets
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href="/account/my-listings"
+            className="rounded-lg border border-[#E8E9EB] bg-white px-4 py-2.5 text-[12px] font-semibold text-[#111111]"
+          >
+            Seller workspace
+          </Link>
+          <Link
+            href="/sell"
+            className="rounded-lg bg-[#111111] px-4 py-2.5 text-[12px] font-semibold text-[#FAFAF7]"
+          >
+            List tickets
+          </Link>
+        </div>
       }
     >
       {ticketsError ? (
@@ -308,6 +319,13 @@ export default function AccountPage() {
               label="Active listings"
               value={ticketsLoading ? "…" : String(activeListings)}
               detail="Tickets currently listed"
+              href="/account/my-listings"
+            />
+            <SummaryCard
+              label="Sales"
+              value={ticketsLoading ? "…" : String(sellerOrders.length)}
+              detail="Orders and delivery status"
+              href="/account/my-listings"
             />
             <ResourceCard>
               <p className="text-[11px] uppercase tracking-wide text-[#292B2F]">

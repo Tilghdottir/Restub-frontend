@@ -68,12 +68,16 @@ export type TicketUploadCompletion = {
   uploadId: string
   slotIndex: number
   status: "verified"
-  ocr: { status: "disabled" } | {
+  ocr: TicketOcrResult
+}
+
+export type TicketOcrResult =
+  | { status: "disabled" | "not_run" | "unavailable" }
+  | {
     confidence: number
     characterCount: number
     eventNameMatch: string | null
   }
-}
 
 export const TICKET_UPLOAD_STATUSES = [
   "upload_pending",
@@ -96,6 +100,7 @@ export type DraftTicketUploadStatus = {
   tickets: Array<{
     slotIndex: number
     status: TicketUploadStatus
+    ocr: TicketOcrResult
   }>
 }
 
@@ -128,7 +133,7 @@ export type ManualReviewEvidenceRecord = {
   mimeType: string
   url: string
   expiresAt: string
-  ocr: { status: "disabled" } | {
+  ocr: { status: "disabled" | "unavailable" } | {
     status: "screened"
     confidence: number
     characterCount: number

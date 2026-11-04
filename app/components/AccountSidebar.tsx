@@ -10,6 +10,7 @@ import Header from "./Header"
 
 const accountLinks = [
   { href: "/account", label: "Dashboard" },
+  { href: "/account/my-listings", label: "Seller workspace" },
   { href: "/account#tickets-heading", label: "My tickets" },
   { href: "/order", label: "Orders" },
 ]

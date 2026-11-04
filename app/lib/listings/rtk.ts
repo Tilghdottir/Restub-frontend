@@ -1,4 +1,8 @@
-import type { CreateListingRequest, CreateTicketUploadRequest } from "./types"
+import type {
+  CreateListingRequest,
+  CreateTicketUploadRequest,
+  UpdateListingRequest,
+} from "./types"
 import {
   completeTicketUpload,
   createListing,
@@ -13,6 +17,7 @@ import {
   submitManualTicketReview,
   getMyListingById,
   getDraftTicketUploadStatus,
+  updateListing,
 } from "./client"
 import { rtkApi, runQuery } from "../rtk-api"
 
@@ -84,6 +89,14 @@ const listingsApi = rtkApi.injectEndpoints({
         runQuery(() => createListing(payload, idempotencyKey)),
       invalidatesTags: ["Listings", "AccountSummary"],
     }),
+    updateListing: builder.mutation<
+      Awaited<ReturnType<typeof updateListing>>,
+      { listingId: string; payload: UpdateListingRequest }
+    >({
+      queryFn: ({ listingId, payload }) =>
+        runQuery(() => updateListing(listingId, payload)),
+      invalidatesTags: ["Listings", "AccountSummary"],
+    }),
     createTicketUpload:
       builder.mutation<Awaited<ReturnType<typeof createTicketUpload>>, {
         listingId: string
@@ -131,6 +144,7 @@ export const {
   useGetListingByIdQuery,
   useLazyGetListingByIdQuery,
   useCreateListingMutation,
+  useUpdateListingMutation,
   useCreateTicketUploadMutation,
   useCompleteTicketUploadMutation,
   useSubmitManualTicketReviewMutation,

@@ -15,6 +15,7 @@ import {
   useLazyGetDraftTicketUploadStatusQuery,
   usePublishListingMutation,
   useSubmitManualTicketReviewMutation,
+  useUpdateListingMutation,
 } from "../lib/listings/rtk"
 import { uploadTicketFileToStorage } from "../lib/listings/client"
 import type {
@@ -23,6 +24,7 @@ import type {
   ListingTicketDetails,
   ListingTicketType,
   ManualListingReviewStatus,
+  TicketOcrResult,
   TicketUploadStatus,
 } from "../lib/listings/types"
 import { LISTING_TICKET_TYPES } from "../lib/listings/types"
@@ -36,6 +38,8 @@ import {
   useLazySearchEventPartnersQuery,
 } from "../lib/events/rtk"
 import type { CatalogPartner } from "../lib/events/models"
+import { useGetKycProfileQuery } from "../lib/kyc/rtk"
+import { useGetPayoutAccountsQuery } from "../lib/payouts/rtk"
 
 const MANUAL_SELECTION = "__manual__"
 const MAX_TICKET_FILE_BYTES = 5 * 1024 * 1024
@@ -56,6 +60,36 @@ function formatFileSize(bytes: number): string {
     : `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
+function normalizeTicketDetails(
+  details: ListingTicketDetails,
+): ListingTicketDetails {
+  return {
+    ...(details.section?.trim() ? { section: details.section.trim() } : {}),
+    ...(details.row?.trim() ? { row: details.row.trim() } : {}),
+    ...(details.seatNumbers?.trim()
+      ? { seatNumbers: details.seatNumbers.trim() }
+      : {}),
+    ...(details.accessArea?.trim()
+      ? { accessArea: details.accessArea.trim() }
+      : {}),
+    ...(details.sessionName?.trim()
+      ? { sessionName: details.sessionName.trim() }
+      : {}),
+    ...(details.packageName?.trim()
+      ? { packageName: details.packageName.trim() }
+      : {}),
+    ...(details.includedAdmissions
+      ? { includedAdmissions: details.includedAdmissions }
+      : {}),
+    ...(details.accessibilityNotes?.trim()
+      ? { accessibilityNotes: details.accessibilityNotes.trim() }
+      : {}),
+    ...(details.otherDetails?.trim()
+      ? { otherDetails: details.otherDetails.trim() }
+      : {}),
+  }
+}
+
 const nairaFormatter = new Intl.NumberFormat("en-NG", {
   style: "currency",
   currency: "NGN",
@@ -70,6 +104,7 @@ export default function SellPage() {
     useLazyGetDraftTicketUploadStatusQuery()
   const [publishListing] = usePublishListingMutation()
   const [submitManualTicketReview] = useSubmitManualTicketReviewMutation()
+  const [updateListing] = useUpdateListingMutation()
   const [eventId, setEventId] = useState("")
   const [partnerId, setPartnerId] = useState("")
   const [manualPartnerName, setManualPartnerName] = useState("")
@@ -105,6 +140,8 @@ export default function SellPage() {
   const [failedTicketSlots, setFailedTicketSlots] = useState<number[]>([])
   const [ticketSlotStatuses, setTicketSlotStatuses] =
     useState<Record<number, TicketUploadStatus>>({})
+  const [ticketOcrSummaries, setTicketOcrSummaries] =
+    useState<Record<number, TicketOcrResult>>({})
   const [uploadingTicketSlot, setUploadingTicketSlot] = useState<number | null>(
     null,
   )
@@ -123,10 +160,21 @@ export default function SellPage() {
     venue: string
   } | null>(null)
   const resumedListingId = useRef<string | null>(null)
-  const [sellStep, setSellStep] = useState<"details" | "uploads">("details")
+  const [sellStep, setSellStep] = useState<
+    "details" | "uploads" | "review"
+  >("details")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [statusMessage, setStatusMessage] = useState<string | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const { data: kycProfile, error: kycError } = useGetKycProfileQuery()
+  const {
+    data: payoutAccounts = [],
+    error: payoutAccountsError,
+  } = useGetPayoutAccountsQuery()
+  const payoutStatus =
+    payoutAccounts.find((account) => account.status === "verified")?.status ??
+    payoutAccounts[0]?.status ??
+    "not configured"
 
   const {
     data: partners = [],
@@ -175,7 +223,8 @@ export default function SellPage() {
   )
   const isManualEvent = isManualPartner || eventId === MANUAL_SELECTION
   const hasPendingSubmission = Boolean(pendingCreatePayload || pendingListingId)
-  const isFormLocked = isSubmitting || hasPendingSubmission
+  const isFormLocked =
+    isSubmitting || (hasPendingSubmission && sellStep !== "review")
   const previewEventName =
     resumedEventDetails?.name ??
     (isManualEvent ? manualEventName : (selectedEvent?.name ?? ""))
@@ -270,8 +319,10 @@ export default function SellPage() {
   const applyDraftTicketStatus = useCallback(
     (status: DraftTicketUploadStatus) => {
       const statuses: Record<number, TicketUploadStatus> = {}
+      const ocrSummaries: Record<number, TicketOcrResult> = {}
       for (const ticket of status.tickets) {
         statuses[ticket.slotIndex] = ticket.status
+        ocrSummaries[ticket.slotIndex] = ticket.ocr
       }
       const verifiedSlots = status.tickets
         .filter(
@@ -287,19 +338,9 @@ export default function SellPage() {
             ticketStatus === "manual_review_rejected",
         )
         .map(({ slotIndex }) => slotIndex)
-      if (status.manualReviewStatus === "rejected") {
-        failedSlots = Array.from(
-          { length: status.quantity },
-          (_, index) => index + 1,
-        )
-        setTicketFiles(Array.from({ length: status.quantity }, () => null))
-        setUploadedTicketSlots([])
-        setTicketUploadIds({})
-      }
       setTicketSlotStatuses(statuses)
-      setVerifiedTicketSlots(
-        status.manualReviewStatus === "rejected" ? [] : verifiedSlots,
-      )
+      setTicketOcrSummaries(ocrSummaries)
+      setVerifiedTicketSlots(verifiedSlots)
       setFailedTicketSlots(failedSlots)
       setManualReviewStatus(status.manualReviewStatus)
       setManualReviewNote(status.manualReviewNote)
@@ -358,6 +399,7 @@ export default function SellPage() {
         setVerifiedTicketSlots([])
         setFailedTicketSlots([])
         setTicketSlotStatuses({})
+        setTicketOcrSummaries({})
         setManualPartnerName(listing.partnerName ?? "")
         setManualPartnerUrl(listing.partnerUrl ?? "")
         setManualEventName(
@@ -376,9 +418,21 @@ export default function SellPage() {
         setPartnerId(listing.partnerId ?? "")
         setEventId(listing.partnerEventId ?? "")
         applyDraftTicketStatus(ticketStatus)
-        setSellStep("uploads")
+        const ticketsReady =
+          ticketStatus.tickets.length === listing.quantity &&
+          ticketStatus.tickets.every(
+            ({ status }) =>
+              status === "verified" || status === "manual_review_approved",
+          )
+        setSellStep(
+          ticketsReady && ticketStatus.manualReviewStatus !== "pending"
+            ? "review"
+            : "uploads",
+        )
         setStatusMessage(
-          "Draft restored. Re-select files for incomplete tickets.",
+          ticketsReady && ticketStatus.manualReviewStatus !== "pending"
+            ? "Draft restored. Confirm the listing details and price before publishing."
+            : "Draft restored. Re-select files for tickets that still need attention.",
         )
       } catch (error) {
         setErrorMessage(
@@ -454,6 +508,11 @@ export default function SellPage() {
     setFailedTicketSlots((current) =>
       current.filter((slot) => slot !== slotIndex),
     )
+    setTicketOcrSummaries((current) => {
+      const next = { ...current }
+      delete next[slotIndex]
+      return next
+    })
     setTicketSlotStatuses((current) => ({
       ...current,
       [slotIndex]: "upload_pending",
@@ -501,6 +560,13 @@ export default function SellPage() {
     setFailedTicketSlots((current) =>
       current.filter((slotIndex) => slotIndex <= nextQuantity),
     )
+    setTicketOcrSummaries((current) =>
+      Object.fromEntries(
+        Object.entries(current).filter(
+          ([slotIndex]) => Number(slotIndex) <= nextQuantity,
+        ),
+      ),
+    )
   }
 
   const handleManualTicketReview = async () => {
@@ -515,10 +581,12 @@ export default function SellPage() {
       setManualReviewNote(null)
       setTicketSlotStatuses(
         Object.fromEntries(
-          Array.from({ length: qty }, (_, index) => [
-            index + 1,
-            "manual_review_pending" as const,
-          ]),
+          Array.from({ length: qty }, (_, index) => index + 1)
+            .filter((slotIndex) => !verifiedTicketSlots.includes(slotIndex))
+            .map((slotIndex) => [
+              slotIndex,
+              "manual_review_pending" as const,
+            ]),
         ),
       )
       setStatusMessage(
@@ -542,6 +610,118 @@ export default function SellPage() {
     setErrorMessage(null)
     setStatusMessage(null)
 
+    if (sellStep === "review") {
+      if (!pendingListingId) {
+        setErrorMessage("The draft listing could not be found. Resume it and try again.")
+        return
+      }
+      if (
+        manualReviewStatus !== "approved" &&
+        verifiedTicketSlots.length !== qty
+      ) {
+        setErrorMessage("Every ticket must be issuer verified or approved by staff before publishing.")
+        return
+      }
+      if (
+        !Number.isInteger(price) ||
+        price < 0 ||
+        price > 21474836
+      ) {
+        setErrorMessage("Enter a whole-naira price between ₦0 and ₦21,474,836.")
+        return
+      }
+      if (!ticketCategory.trim()) {
+        setErrorMessage("Enter a ticket category or tier name.")
+        return
+      }
+      if (
+        ticketType === "reserved_seating" &&
+        !ticketDetails.section?.trim() &&
+        !ticketDetails.seatNumbers?.trim()
+      ) {
+        setErrorMessage("Enter a section or seat number for reserved seating.")
+        return
+      }
+      if (ticketType === "pass_session" && !ticketDetails.sessionName?.trim()) {
+        setErrorMessage("Enter the pass or session name.")
+        return
+      }
+      if (
+        isPackage &&
+        (!Number.isInteger(ticketDetails.includedAdmissions) ||
+          !ticketDetails.includedAdmissions ||
+          ticketDetails.includedAdmissions < 1 ||
+          ticketDetails.includedAdmissions > 100)
+      ) {
+        setErrorMessage("Enter between 1 and 100 included admissions.")
+        return
+      }
+      if (
+        ticketType === "accessible" &&
+        !ticketDetails.accessibilityNotes?.trim() &&
+        !ticketDetails.section?.trim() &&
+        !ticketDetails.seatNumbers?.trim()
+      ) {
+        setErrorMessage("Enter accessibility or seat details.")
+        return
+      }
+      if (ticketType === "other" && !ticketDetails.otherDetails?.trim()) {
+        setErrorMessage("Describe the ticket details.")
+        return
+      }
+
+      setIsSubmitting(true)
+      try {
+        const listing = await fetchMyListing(pendingListingId).unwrap()
+        if (listing.status === "draft") {
+          const eventName =
+            previewEventName.trim() ||
+            listing.eventName?.trim() ||
+            listing.title.split(" — ")[0]
+          await updateListing({
+            listingId: pendingListingId,
+            payload: {
+              title: `${eventName} — ${ticketCategory.trim()}`,
+              ticketCategory: ticketCategory.trim(),
+              ticketType,
+              ticketDetails: normalizeTicketDetails(ticketDetails),
+              price,
+            },
+          }).unwrap()
+          await publishListing({
+            listingId: pendingListingId,
+            idempotencyKey: pendingPublishKey ?? undefined,
+          }).unwrap()
+        } else if (listing.status !== "published") {
+          throw new Error("This listing is no longer available to publish.")
+        }
+        setPendingListingId(null)
+        setPendingPublishKey(null)
+        setPendingCreatePayload(null)
+        setManualReviewSubmitted(false)
+        setManualReviewStatus("not_submitted")
+        setManualReviewNote(null)
+        setCreateListingKey(createIdempotencyKey())
+        setSellStep("details")
+        setUploadedTicketSlots([])
+        setTicketUploadIds({})
+        setVerifiedTicketSlots([])
+        setFailedTicketSlots([])
+        setTicketFiles([])
+        setTicketSlotStatuses({})
+        setTicketOcrSummaries({})
+        setResumedEventDetails(null)
+        setStatusMessage("Listing published successfully.")
+      } catch (error) {
+        setErrorMessage(
+          getApiErrorMessage(error, "Unable to publish listing."),
+        )
+      } finally {
+        setIsSubmitting(false)
+      }
+      return
+    }
+
     if (pendingListingId && manualReviewStatus === "pending") {
       setIsSubmitting(true)
       try {
@@ -557,15 +737,16 @@ export default function SellPage() {
         if (status.manualReviewStatus === "rejected") {
           setErrorMessage(
             status.manualReviewNote ||
-              "Ticket evidence was rejected. Select replacement files for every ticket.",
+              "Some ticket evidence was rejected. Replace the rejected files and submit them again.",
           )
           return
         }
         if (status.manualReviewStatus !== "approved") {
           throw new Error("The ticket review status could not be confirmed.")
         }
+        setSellStep("review")
         setStatusMessage(
-          "Ticket evidence was approved. Publish the listing when you’re ready.",
+          "Staff approved the submitted ticket evidence. Confirm your listing and price before publishing.",
         )
       } catch (error) {
         setErrorMessage(
@@ -578,35 +759,10 @@ export default function SellPage() {
     }
 
     if (pendingListingId && manualReviewStatus === "approved") {
-      setIsSubmitting(true)
-      try {
-        await publishListing({
-          listingId: pendingListingId,
-          idempotencyKey: pendingPublishKey ?? undefined,
-        }).unwrap()
-        setPendingListingId(null)
-        setPendingPublishKey(null)
-        setPendingCreatePayload(null)
-        setManualReviewSubmitted(false)
-        setManualReviewStatus("not_submitted")
-        setManualReviewNote(null)
-        setCreateListingKey(createIdempotencyKey())
-        setSellStep("details")
-        setUploadedTicketSlots([])
-        setTicketUploadIds({})
-        setVerifiedTicketSlots([])
-        setFailedTicketSlots([])
-        setTicketFiles([])
-        setTicketSlotStatuses({})
-        setResumedEventDetails(null)
-        setStatusMessage("Listing published successfully.")
-      } catch (error) {
-        setErrorMessage(
-          getApiErrorMessage(error, "Unable to check or publish the listing."),
-        )
-      } finally {
-        setIsSubmitting(false)
-      }
+      setSellStep("review")
+      setStatusMessage(
+        "Staff approved the submitted ticket evidence. Confirm your listing and price before publishing.",
+      )
       return
     }
 
@@ -686,41 +842,6 @@ export default function SellPage() {
         setErrorMessage("Enter a ticket category or tier name.")
         return
       }
-      if (
-        ticketType === "reserved_seating" &&
-        !ticketDetails.section?.trim() &&
-        !ticketDetails.seatNumbers?.trim()
-      ) {
-        setErrorMessage("Enter a section or seat number for reserved seating.")
-        return
-      }
-      if (ticketType === "pass_session" && !ticketDetails.sessionName?.trim()) {
-        setErrorMessage("Enter the pass or session name.")
-        return
-      }
-      if (
-        isPackage &&
-        (!Number.isInteger(ticketDetails.includedAdmissions) ||
-          !ticketDetails.includedAdmissions ||
-          ticketDetails.includedAdmissions < 1 ||
-          ticketDetails.includedAdmissions > 100)
-      ) {
-        setErrorMessage("Enter between 1 and 100 included admissions.")
-        return
-      }
-      if (
-        ticketType === "accessible" &&
-        !ticketDetails.accessibilityNotes?.trim() &&
-        !ticketDetails.section?.trim() &&
-        !ticketDetails.seatNumbers?.trim()
-      ) {
-        setErrorMessage("Enter accessibility or seat details.")
-        return
-      }
-      if (ticketType === "other" && !ticketDetails.otherDetails?.trim()) {
-        setErrorMessage("Describe the ticket details.")
-        return
-      }
       if (!Number.isInteger(qty) || qty < 1 || qty > 10) {
         setErrorMessage("Quantity must be a whole number from 1 to 10.")
         return
@@ -770,35 +891,8 @@ export default function SellPage() {
                 manualPartnerUrl.trim() ? ` (${manualPartnerUrl.trim()})` : ""
               } • `
             : ""
-          const normalizedTicketDetails: ListingTicketDetails = {
-            ...(ticketDetails.section?.trim()
-              ? { section: ticketDetails.section.trim() }
-              : {}),
-            ...(ticketDetails.row?.trim()
-              ? { row: ticketDetails.row.trim() }
-              : {}),
-            ...(ticketDetails.seatNumbers?.trim()
-              ? { seatNumbers: ticketDetails.seatNumbers.trim() }
-              : {}),
-            ...(ticketDetails.accessArea?.trim()
-              ? { accessArea: ticketDetails.accessArea.trim() }
-              : {}),
-            ...(ticketDetails.sessionName?.trim()
-              ? { sessionName: ticketDetails.sessionName.trim() }
-              : {}),
-            ...(ticketDetails.packageName?.trim()
-              ? { packageName: ticketDetails.packageName.trim() }
-              : {}),
-            ...(ticketDetails.includedAdmissions
-              ? { includedAdmissions: ticketDetails.includedAdmissions }
-              : {}),
-            ...(ticketDetails.accessibilityNotes?.trim()
-              ? { accessibilityNotes: ticketDetails.accessibilityNotes.trim() }
-              : {}),
-            ...(ticketDetails.otherDetails?.trim()
-              ? { otherDetails: ticketDetails.otherDetails.trim() }
-              : {}),
-          }
+          const normalizedTicketDetails =
+            normalizeTicketDetails(ticketDetails)
           const locationDetails = [
             normalizedTicketDetails.section
               ? `Section ${normalizedTicketDetails.section}`
@@ -836,7 +930,7 @@ export default function SellPage() {
             ticketType,
             ticketDetails: normalizedTicketDetails,
             quantity: qty,
-            price,
+            price: 0,
             ...(!isManualPartner && partner ? { partnerId: partner.id } : {}),
             ...(!isManualEvent && catalogEvent
               ? { partnerEventId: catalogEvent.id }
@@ -960,6 +1054,10 @@ export default function SellPage() {
             ...current,
             [slotIndex]: "verified",
           }))
+          setTicketOcrSummaries((current) => ({
+            ...current,
+            [slotIndex]: completed.ocr,
+          }))
           setVerifiedTicketSlots([...verifiedSlots])
           setFailedTicketSlots([...failedSlots])
         } catch (error) {
@@ -977,31 +1075,22 @@ export default function SellPage() {
         }
       }
       if (verificationErrors.length > 0) {
+        try {
+          await refreshDraftTicketStatus(listingId, qty)
+        } catch (error) {
+          verificationErrors.push(
+            `Unable to refresh ticket screening status: ${getApiErrorMessage(error, "Status refresh failed.")}`,
+          )
+        }
         throw new Error(
           `Ticket verification needs attention. ${verificationErrors.join(" ")}`,
         )
       }
 
-      await publishListing({
-        listingId,
-        idempotencyKey: publishKey ?? undefined,
-      }).unwrap()
-      setPendingListingId(null)
-      setPendingPublishKey(null)
-      setPendingCreatePayload(null)
-      setCreateListingKey(createIdempotencyKey())
-      setUploadedTicketSlots([])
-      setTicketUploadIds({})
-      setVerifiedTicketSlots([])
-      setFailedTicketSlots([])
-      setTicketFiles([])
-      setTicketSlotStatuses({})
-      setResumedEventDetails(null)
-      setManualReviewSubmitted(false)
-      setManualReviewStatus("not_submitted")
-      setManualReviewNote(null)
-      setSellStep("details")
-      setStatusMessage("Listing published successfully.")
+      setSellStep("review")
+      setStatusMessage(
+        "Ticket screening is complete. Confirm the listing details and price before publishing.",
+      )
     } catch (error) {
       const apiMessage = getApiErrorMessage(error, "Unable to publish listing.")
       setErrorMessage(
@@ -1040,11 +1129,14 @@ export default function SellPage() {
             aria-label="Listing steps"
           >
             {[
-              { id: "details", label: "1. Listing details" },
+              { id: "details", label: "1. Event & ticket quantity" },
               { id: "uploads", label: "2. Upload tickets" },
+              { id: "review", label: "3. Confirm & publish" },
             ].map((step) => {
               const isActive = sellStep === step.id
-              const isComplete = sellStep === "uploads" && step.id === "details"
+              const isComplete =
+                (sellStep === "uploads" && step.id === "details") ||
+                (sellStep === "review" && step.id !== "review")
 
               return (
                 <div
@@ -1495,13 +1587,13 @@ export default function SellPage() {
                 className="bg-white border rounded-lg p-5"
                 style={{ borderColor: "#E8E9EB" }}
               >
-                {sellStep === "details" ? (
+                {sellStep === "review" ? (
                   <>
                     <h2
                       className="text-[12px] font-semibold uppercase tracking-wide mb-4"
                       style={{ color: "#111111" }}
                     >
-                      Ticket details
+                      Confirm ticket details
                     </h2>
                     <div className="mb-4 grid gap-4 md:grid-cols-2">
                       <div>
@@ -1673,10 +1765,71 @@ export default function SellPage() {
                           max={10}
                           step={1}
                           required
-                          disabled={isFormLocked}
+                          disabled={isSubmitting || hasPendingSubmission}
                           value={qty}
                           onChange={(e) => setQty(Number(e.target.value) || 1)}
                           className="w-full border rounded-lg px-4 py-2.5 text-[14px] focus:outline-none focus:ring-1"
+                          style={{
+                            backgroundColor: "#FAFAF7",
+                            borderColor: "#E8E9EB",
+                            color: "#111111",
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </>
+                ) : sellStep === "details" ? (
+                  <>
+                    <h2 className="mb-4 text-[12px] font-semibold uppercase tracking-wide text-[#111111]">
+                      Ticket basics
+                    </h2>
+                    <p className="mb-4 text-[12px] text-[#62656A]">
+                      Choose the ticket tier and number of files to upload.
+                      Detailed seat and access information can be confirmed
+                      after the tickets are screened.
+                    </p>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div>
+                        <label
+                          htmlFor="ticket-category"
+                          className="mb-1.5 block text-[12px] font-medium text-[#111111]"
+                        >
+                          Ticket tier or package name
+                        </label>
+                        <input
+                          id="ticket-category"
+                          required
+                          maxLength={100}
+                          disabled={isFormLocked}
+                          value={ticketCategory}
+                          onChange={(event) =>
+                            setTicketCategory(event.target.value)
+                          }
+                          placeholder="e.g. General Admission"
+                          className="w-full rounded-lg border px-4 py-2.5 text-[14px]"
+                          style={{
+                            backgroundColor: "#FAFAF7",
+                            borderColor: "#E8E9EB",
+                            color: "#111111",
+                          }}
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-1.5 block text-[12px] font-medium text-[#111111]">
+                          Number of tickets or packages
+                        </label>
+                        <input
+                          type="number"
+                          min={1}
+                          max={10}
+                          step={1}
+                          required
+                          disabled={isSubmitting || hasPendingSubmission}
+                          value={qty}
+                          onChange={(event) =>
+                            setQty(Number(event.target.value) || 1)
+                          }
+                          className="w-full rounded-lg border px-4 py-2.5 text-[14px]"
                           style={{
                             backgroundColor: "#FAFAF7",
                             borderColor: "#E8E9EB",
@@ -1691,9 +1844,81 @@ export default function SellPage() {
                     className="text-[12px] font-semibold uppercase tracking-wide mb-4"
                     style={{ color: "#111111" }}
                   >
-                    Upload and verify tickets
+                    Upload and screen tickets
                   </h2>
                 )}
+                {sellStep === "review" ? (
+                  <div className="space-y-3">
+                    <div className="rounded-lg border border-[#E8E9EB] bg-[#FAFAF7] p-4">
+                      <p className="text-[15px] font-semibold text-[#111111]">
+                        {previewEventName || "Event details"}
+                      </p>
+                      <p className="mt-1 text-[12px] text-[#292B2F]">
+                        {[previewEventDate, previewEventVenue]
+                          .filter(Boolean)
+                          .join(" · ") || "Event date or venue not provided"}
+                      </p>
+                    </div>
+                    <div className="rounded-lg border border-[#E8E9EB] p-4">
+                      <p className="text-[13px] font-semibold text-[#111111]">
+                        {ticketCategory} · {LISTING_TICKET_TYPE_LABELS[ticketType]}
+                      </p>
+                      <p className="mt-1 text-[12px] text-[#292B2F]">
+                        {qty} {isPackage ? "packages" : "tickets"} ·{" "}
+                        {previewTicketDetails.slice(1).join(" · ") ||
+                          "No additional seat or access details"}
+                      </p>
+                    </div>
+                    <p className="rounded-lg border border-[#E8E9EB] px-3 py-2.5 text-[12px] text-[#292B2F]">
+                      Ticket screening is not proof that a ticket is authentic,
+                      valid, or unused. Review your details and price before
+                      publishing.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setSellStep("uploads")}
+                      className="text-[12px] font-medium underline underline-offset-2 text-[#111111]"
+                    >
+                      Back to ticket files
+                    </button>
+                  </div>
+                ) : null}
+                {sellStep === "review" ? (
+                  <div className="mt-4 rounded-lg border border-[#E8E9EB] bg-white p-4">
+                    <h3 className="text-[13px] font-semibold text-[#111111]">
+                      Before you publish
+                    </h3>
+                    <p className="mt-2 text-[12px] text-[#292B2F]">
+                      Identity verification is required to publish. A verified
+                      payout account may also be required, depending on the
+                      payment provider.
+                    </p>
+                    <div className="mt-3 flex flex-wrap gap-4 text-[12px]">
+                      <span>
+                        Identity: {kycProfile?.status ?? "checking"}
+                      </span>
+                      <Link
+                        href="/account/kyc"
+                        className="font-medium underline underline-offset-2 text-[#111111]"
+                      >
+                        Review identity verification
+                      </Link>
+                      <span>Payout account: {payoutStatus}</span>
+                      <Link
+                        href="/payout-account"
+                        className="font-medium underline underline-offset-2 text-[#111111]"
+                      >
+                        Manage payouts
+                      </Link>
+                    </div>
+                    {kycError || payoutAccountsError ? (
+                      <ApiErrorNotice
+                        error={kycError ?? payoutAccountsError}
+                        fallback="Unable to check verification or payout status."
+                      />
+                    ) : null}
+                  </div>
+                ) : null}
                 {sellStep === "uploads" &&
                 manualReviewStatus !== "not_submitted" ? (
                   <div
@@ -1723,8 +1948,8 @@ export default function SellPage() {
                     {manualReviewStatus === "pending"
                       ? "Ticket evidence is awaiting staff review. Uploads and publishing are paused until the review is complete."
                       : manualReviewStatus === "approved"
-                        ? "Ticket evidence was approved. Publish this draft when you’re ready."
-                        : `Ticket evidence was rejected. Select replacement files for every ticket and submit them for review again.${
+                        ? "Staff approved the submitted evidence. Confirm your listing details and price before publishing."
+                        : `Some ticket evidence was rejected. Replace the rejected files and request review again.${
                             manualReviewNote
                               ? ` Reviewer note: ${manualReviewNote}`
                               : ""
@@ -1791,7 +2016,9 @@ export default function SellPage() {
                     >
                       Files stay private and are never shown to buyers. Your
                       listing can be published after all files are verified or
-                      approved through manual review.
+                      approved through staff review. If the issuer cannot verify
+                      a file, you can request staff review for the unresolved
+                      tickets; issuer-verified tickets remain verified.
                     </p>
                     <div className="space-y-3">
                       {Array.from({ length: qty }, (_, index) => {
@@ -1806,6 +2033,7 @@ export default function SellPage() {
                         const isUploaded =
                           uploadedTicketSlots.includes(slotIndex)
                         const ticketStatus = ticketSlotStatuses[slotIndex]
+                        const ocrSummary = ticketOcrSummaries[slotIndex]
                         const isProcessing = ticketStatus === "processing"
                         const isReviewPending =
                           ticketStatus === "manual_review_pending"
@@ -1817,7 +2045,7 @@ export default function SellPage() {
                         const statusLabel = isReviewApproved
                           ? "Review approved"
                           : isVerified
-                            ? "Verified"
+                            ? "Issuer verified"
                             : isReviewPending
                               ? "Under manual review"
                               : isReviewRejected
@@ -1908,7 +2136,7 @@ export default function SellPage() {
                                     (isReviewApproved
                                       ? "Approved by staff"
                                       : isVerified
-                                        ? "Ticket verified"
+                                        ? "Issuer verified"
                                         : "Drop a file here or browse")}
                                 </span>
                                 <span
@@ -1920,7 +2148,7 @@ export default function SellPage() {
                                     : isReviewApproved
                                       ? "Approved through manual review"
                                       : isVerified
-                                        ? "Verified ticket evidence"
+                                        ? "Issuer-verified ticket"
                                         : "PDF, JPEG, or PNG · Maximum 5 MB"}
                                 </span>
                               </span>
@@ -2016,6 +2244,33 @@ export default function SellPage() {
                                   : "The upload didn’t finish. Retry this file."}
                               </p>
                             ) : null}
+                            {ocrSummary ? (
+                              <p className="mt-2 text-[11px] text-[#62656A]">
+                                {"status" in ocrSummary ? (
+                                  ocrSummary.status === "disabled"
+                                    ? "OCR screening is disabled."
+                                    : ocrSummary.status === "not_run"
+                                      ? "OCR screening has not run yet."
+                                      : "OCR screening signals are unavailable for this file."
+                                ) : (
+                                  <>
+                                    Screening signals:{" "}
+                                    {Math.round(
+                                      ocrSummary.confidence,
+                                    )}
+                                    % confidence ·{" "}
+                                    {ocrSummary.characterCount}{" "}
+                                    characters · event-name match:{" "}
+                                    {ocrSummary.eventNameMatch ?? "not reported"}
+                                  </>
+                                )}{" "}
+                                {"status" in ocrSummary &&
+                                ocrSummary.status !== "disabled" &&
+                                ocrSummary.status !== "not_run"
+                                  ? "Staff may inspect the uploaded ticket directly."
+                                  : "Screening signals do not confirm that a ticket is valid, authentic, or unused."}
+                              </p>
+                            ) : null}
                           </div>
                         )
                       })}
@@ -2058,40 +2313,49 @@ export default function SellPage() {
                 </p>
               </div>
 
-              <div
-                className="border-t pt-4"
-                style={{ borderColor: "rgba(250,250,247,0.08)" }}
-              >
-                <div className="flex items-center justify-between mb-3">
-                  <span
-                    className="text-[12px]"
-                    style={{ color: "rgba(250,250,247,0.6)" }}
-                  >
-                    {isPackage
-                      ? "Price per package (NGN)"
-                      : "Price per ticket (NGN)"}
-                  </span>
-                  <span className="font-mono-data text-[16px] font-semibold">
-                    {nairaFormatter.format(price || 0)}
-                  </span>
+              {sellStep === "review" ? (
+                <div
+                  className="border-t pt-4"
+                  style={{ borderColor: "rgba(250,250,247,0.08)" }}
+                >
+                  <div className="mb-3 flex items-center justify-between">
+                    <span
+                      className="text-[12px]"
+                      style={{ color: "rgba(250,250,247,0.6)" }}
+                    >
+                      {isPackage
+                        ? "Price per package (NGN)"
+                        : "Price per ticket (NGN)"}
+                    </span>
+                    <span className="font-mono-data text-[16px] font-semibold">
+                      {nairaFormatter.format(price || 0)}
+                    </span>
+                  </div>
+                  <input
+                    type="number"
+                    min={0}
+                    max={21474836}
+                    step={1}
+                    required
+                    disabled={isSubmitting}
+                    value={price}
+                    onChange={(e) => setPrice(Number(e.target.value) || 0)}
+                    className="w-full rounded-lg px-4 py-2.5 text-[14px] focus:outline-none"
+                    style={{
+                      backgroundColor: "#1A1A1A",
+                      color: "#FAFAF7",
+                      border: "1px solid rgba(250,250,247,0.1)",
+                    }}
+                  />
                 </div>
-                <input
-                  type="number"
-                  min={0}
-                  max={21474836}
-                  step={1}
-                  required
-                  disabled={isFormLocked}
-                  value={price}
-                  onChange={(e) => setPrice(Number(e.target.value) || 0)}
-                  className="w-full rounded-lg px-4 py-2.5 text-[14px] focus:outline-none"
-                  style={{
-                    backgroundColor: "#1A1A1A",
-                    color: "#FAFAF7",
-                    border: "1px solid rgba(250,250,247,0.1)",
-                  }}
-                />
-              </div>
+              ) : (
+                <p
+                  className="border-t pt-4 text-center text-[12px] text-white/70"
+                  style={{ borderColor: "rgba(250,250,247,0.08)" }}
+                >
+                  Your price is set after ticket screening.
+                </p>
+              )}
 
               <button
                 type="button"
@@ -2104,21 +2368,23 @@ export default function SellPage() {
               >
                 {isSubmitting
                   ? "Working…"
-                  : sellStep === "details"
+                  : sellStep === "review"
+                    ? "Publish listing"
+                    : sellStep === "details"
                     ? pendingCreatePayload
                       ? "Retry saving details"
                       : "Continue to ticket uploads"
                     : manualReviewStatus === "pending"
                       ? "Check review status"
                       : manualReviewStatus === "approved"
-                        ? "Publish approved listing"
+                        ? "Confirm listing details"
                         : Object.values(ticketSlotStatuses).includes(
                               "processing",
                             )
                           ? "Refresh ticket status"
                           : pendingListingId
                             ? verifiedTicketSlots.length === qty
-                              ? "Retry publishing listing"
+                              ? "Review listing and set price"
                               : "Upload and verify tickets"
                             : pendingCreatePayload
                               ? "Retry listing creation"
@@ -2127,9 +2393,9 @@ export default function SellPage() {
               {pendingListingId &&
               !manualReviewSubmitted &&
               manualReviewStatus !== "approved" &&
-              uploadedTicketSlots.length === qty &&
-              failedTicketSlots.length === qty &&
-              verifiedTicketSlots.length === 0 ? (
+              new Set([...verifiedTicketSlots, ...uploadedTicketSlots]).size ===
+                qty &&
+              failedTicketSlots.length > 0 ? (
                 <button
                   type="button"
                   onClick={handleManualTicketReview}
@@ -2140,7 +2406,7 @@ export default function SellPage() {
                     color: "#FAFAF7",
                   }}
                 >
-                  Request manual ticket review
+                  Request staff review for tickets that could not be verified
                 </button>
               ) : null}
               {statusMessage ? (

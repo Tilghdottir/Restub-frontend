@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import Link from "next/link"
 import AccountPageShell, { ResourceCard } from "../components/AccountPageShell"
 import ApiErrorNotice from "../components/ApiErrorNotice"
 import type { SubmitKycRequest } from "../lib/kyc/types"
@@ -119,6 +120,21 @@ export default function KycPage() {
           </div>
         </div>
 
+      </ResourceCard>
+      <ResourceCard>
+        <h2 className="text-[15px] font-semibold text-[#111111]">
+          Seller payout setup
+        </h2>
+        <p className="mt-1 text-[13px] text-[#292B2F]">
+          A verified identity is required before you can publish listings.
+          Payout setup may also be required before publication.
+        </p>
+        <Link
+          href="/payout-account"
+          className="mt-3 inline-block text-[12px] font-semibold underline underline-offset-2 text-[#111111]"
+        >
+          Continue to payout setup
+        </Link>
       </ResourceCard>
       <button
         type="button"

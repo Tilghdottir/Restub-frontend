@@ -4,6 +4,8 @@ import { useState } from "react"
 import AccountPageShell, { ResourceCard } from "../components/AccountPageShell"
 import ApiErrorNotice from "../components/ApiErrorNotice"
 import { getApiErrorMessage } from "../lib/rtk-api"
+import Link from "next/link"
+import { useGetKycProfileQuery } from "../lib/kyc/rtk"
 import {
   useCreatePayoutAccountMutation,
   useGetPayoutAccountsQuery,
@@ -13,6 +15,7 @@ import {
 export default function PayoutAccountPage() {
   const { data: accounts = [], error: accountsError } =
     useGetPayoutAccountsQuery()
+  const { data: kycProfile, error: kycError } = useGetKycProfileQuery()
   const [createPayoutAccount, { isLoading: submitting }] =
     useCreatePayoutAccountMutation()
   const [startBachsOnboarding, { isLoading: onboarding }] =
@@ -30,6 +33,31 @@ export default function PayoutAccountPage() {
         fallback="Unable to load payout accounts."
       />
       <div className="space-y-4">
+        <ResourceCard>
+          <h2 className="text-[15px] font-semibold text-[#111111]">
+            Identity verification
+          </h2>
+          <p className="mt-1 text-[13px] text-[#292B2F]">
+            Adding a bank payout account requires verified identity. Complete
+            KYC first; connected Bachs accounts may have additional onboarding
+            requirements.
+          </p>
+          <div className="mt-3 flex flex-wrap items-center gap-3 text-[12px]">
+            <span className="capitalize text-[#292B2F]">
+              Status: {kycProfile?.status ?? "checking"}
+            </span>
+            <Link
+              href="/account/kyc"
+              className="font-semibold underline underline-offset-2 text-[#111111]"
+            >
+              Review KYC
+            </Link>
+          </div>
+          <ApiErrorNotice
+            error={kycError}
+            fallback="Unable to load identity verification status."
+          />
+        </ResourceCard>
         <ResourceCard>
           <h2
             className="text-[15px] font-semibold"

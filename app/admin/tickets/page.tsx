@@ -171,7 +171,7 @@ function TicketVerificationContent() {
             value={error ? "Unavailable" : submissions.length}
           />
           <SummaryCard
-            label="Tickets awaiting review"
+            label="Tickets in pending listings"
             value={error ? "Unavailable" : evidenceCount}
           />
         </section>
@@ -336,9 +336,11 @@ function TicketVerificationContent() {
                               Ticket {item.slotIndex} · {item.mimeType}
                             </p>
                             <p className="mt-1 text-[11px] text-[#292B2F]">
-                              {item.ocr.status === "disabled"
-                                ? "OCR screening unavailable"
-                                : `OCR confidence ${Math.round(item.ocr.confidence * 100)}% · ${item.ocr.characterCount} characters · event match ${item.ocr.eventNameMatch ?? "unknown"}`}
+                              {item.ocr.status === "screened"
+                                ? `OCR confidence ${Math.round(item.ocr.confidence)}% · ${item.ocr.characterCount} characters · event match ${item.ocr.eventNameMatch ?? "unknown"}`
+                                : item.ocr.status === "disabled"
+                                  ? "OCR screening disabled"
+                                  : "OCR could not screen this file; inspect the ticket directly"}
                             </p>
                             <p className="mt-1 text-[11px] text-[#292B2F]">
                               Link expires {formatDate(item.expiresAt)}

@@ -7,6 +7,7 @@ import type {
   ManualReviewDecision,
   TicketUploadCompletion,
   TicketUploadForm,
+  UpdateListingRequest,
 } from "./types"
 import { TICKET_UPLOAD_STATUSES } from "./types"
 import type {
@@ -146,6 +147,8 @@ export async function getManualReviewEvidence(
       ocr:
         ocrStatus === "disabled"
           ? { status: "disabled" }
+          : ocrStatus === "unavailable"
+            ? { status: "unavailable" }
           : {
               status: "screened",
               confidence: requireNumber(
@@ -302,6 +305,20 @@ export async function createListing(
   return normalizeListing(result)
 }
 
+export async function updateListing(
+  listingId: string,
+  payload: UpdateListingRequest,
+): Promise<ListingSummary> {
+  const result = await authenticatedRequest<unknown>(
+    `/listings/${encodeURIComponent(listingId)}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    },
+  )
+  return normalizeListing(result)
+}
+
 export async function createTicketUpload(
   listingId: string,
   payload: CreateTicketUploadRequest,
@@ -392,6 +409,8 @@ export async function getDraftTicketUploadStatus(
         "Invalid API response: ticket slot is outside listing quantity.",
       )
     }
+    const ocr = expectRecord(ticket.ocr, "draft ticket upload OCR result")
+    const ocrStatus = ocr.status
     return {
       slotIndex,
       status: requireOneOf(
@@ -400,6 +419,35 @@ export async function getDraftTicketUploadStatus(
         TICKET_UPLOAD_STATUSES,
         "draft ticket upload",
       ),
+      ocr:
+        ocrStatus === "disabled" ||
+        ocrStatus === "not_run" ||
+        ocrStatus === "unavailable"
+          ? {
+              status: requireOneOf(
+                ocr,
+                "status",
+                ["disabled", "not_run", "unavailable"] as const,
+                "draft ticket upload OCR result",
+              ),
+            }
+          : {
+              confidence: requireNumber(
+                ocr,
+                "confidence",
+                "draft ticket upload OCR result",
+              ),
+              characterCount: requireNumber(
+                ocr,
+                "characterCount",
+                "draft ticket upload OCR result",
+              ),
+              eventNameMatch: requireNullableString(
+                ocr,
+                "eventNameMatch",
+                "draft ticket upload OCR result",
+              ),
+            },
     }
   })
   if (
