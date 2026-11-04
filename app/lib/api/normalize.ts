@@ -54,6 +54,16 @@ export function normalizeListing(value: unknown): ListingSummary {
   )
   const manualReviewStatus = listing.manualReviewStatus
   const manualReviewNote = listing.manualReviewNote
+  const publicationBlockers = listing.publicationBlockers
+  if (
+    publicationBlockers !== undefined &&
+    (!Array.isArray(publicationBlockers) ||
+      publicationBlockers.some((blocker) => typeof blocker !== "string"))
+  ) {
+    throw new Error(
+      "Invalid API response: listing.publicationBlockers must be a string array.",
+    )
+  }
   if (
     manualReviewNote !== undefined &&
     manualReviewNote !== null &&
@@ -81,6 +91,13 @@ export function normalizeListing(value: unknown): ListingSummary {
         }
       : {}),
     ...(manualReviewNote === undefined ? {} : { manualReviewNote }),
+    ...(publicationBlockers === undefined
+      ? {}
+      : {
+          publicationBlockers: publicationBlockers.filter(
+            (blocker): blocker is string => typeof blocker === "string",
+          ),
+        }),
     venue: "Online marketplace",
     ticketCategory: asString(listing.ticketCategory, "General Admission"),
     ticketType:
@@ -138,8 +155,10 @@ export function parseListingApiRecord(value: unknown): ListingApiRecord {
   const ownerId = listing.ownerId
   const updatedAt = listing.updatedAt
   const deleted = listing.deleted
+  const priceConfirmed = listing.priceConfirmed
   const manualReviewStatus = listing.manualReviewStatus
   const manualReviewNote = listing.manualReviewNote
+  const publicationBlockers = listing.publicationBlockers
   const optionalString = (field: string): string | undefined => {
     const fieldValue = listing[field]
     if (fieldValue === undefined) return undefined
@@ -169,6 +188,11 @@ export function parseListingApiRecord(value: unknown): ListingApiRecord {
   if (deleted !== undefined && typeof deleted !== "boolean") {
     throw new Error("Invalid API response: listing.deleted must be a boolean.")
   }
+  if (priceConfirmed !== undefined && typeof priceConfirmed !== "boolean") {
+    throw new Error(
+      "Invalid API response: listing.priceConfirmed must be a boolean.",
+    )
+  }
   if (
     manualReviewNote !== undefined &&
     manualReviewNote !== null &&
@@ -176,6 +200,15 @@ export function parseListingApiRecord(value: unknown): ListingApiRecord {
   ) {
     throw new Error(
       "Invalid API response: listing.manualReviewNote must be a string or null.",
+    )
+  }
+  if (
+    publicationBlockers !== undefined &&
+    (!Array.isArray(publicationBlockers) ||
+      publicationBlockers.some((blocker) => typeof blocker !== "string"))
+  ) {
+    throw new Error(
+      "Invalid API response: listing.publicationBlockers must be a string array.",
     )
   }
 
@@ -215,6 +248,14 @@ export function parseListingApiRecord(value: unknown): ListingApiRecord {
           manualReviewNote:
             manualReviewNote === null ? null : asString(manualReviewNote),
         }),
+    ...(publicationBlockers === undefined
+      ? {}
+      : {
+          publicationBlockers: publicationBlockers.filter(
+            (blocker): blocker is string => typeof blocker === "string",
+          ),
+        }),
+    ...(typeof priceConfirmed === "boolean" ? { priceConfirmed } : {}),
     ...(summary.date ? { createdAt: summary.date } : {}),
     ...(typeof updatedAt === "string" ? { updatedAt } : {}),
     ...(typeof deleted === "boolean" ? { deleted } : {}),

@@ -3,6 +3,7 @@
 import AccountPageShell, { ResourceCard } from "../components/AccountPageShell"
 import ApiErrorNotice from "../components/ApiErrorNotice"
 import { useGetNotificationsQuery } from "../lib/account-data/rtk"
+import Link from "next/link"
 
 export default function NotificationPage() {
   const { data: notifications = [], error } = useGetNotificationsQuery()
@@ -24,7 +25,7 @@ export default function NotificationPage() {
                 }}
               />
               <div>
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-3">
                   <p
                     className="text-[14px] font-semibold"
                     style={{ color: "#111111" }}
@@ -42,6 +43,14 @@ export default function NotificationPage() {
                 <p className="text-[13px] mt-1" style={{ color: "#292B2F" }}>
                   {notification.body}
                 </p>
+                {notification.href ? (
+                  <Link
+                    href={notification.href}
+                    className="mt-2 inline-block text-[12px] font-semibold underline underline-offset-2 text-[#111111]"
+                  >
+                    View seller workspace
+                  </Link>
+                ) : null}
               </div>
             </div>
           </ResourceCard>

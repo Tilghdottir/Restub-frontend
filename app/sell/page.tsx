@@ -931,6 +931,7 @@ export default function SellPage() {
             ticketDetails: normalizedTicketDetails,
             quantity: qty,
             price: 0,
+            priceConfirmed: false,
             ...(!isManualPartner && partner ? { partnerId: partner.id } : {}),
             ...(!isManualEvent && catalogEvent
               ? { partnerEventId: catalogEvent.id }
@@ -1946,7 +1947,7 @@ export default function SellPage() {
                     role="status"
                   >
                     {manualReviewStatus === "pending"
-                      ? "Ticket evidence is awaiting staff review. Uploads and publishing are paused until the review is complete."
+                      ? "Your ticket evidence is submitted and the listing is not live. You can leave this page; an in-app notification will be available when staff decide."
                       : manualReviewStatus === "approved"
                         ? "Staff approved the submitted evidence. Confirm your listing details and price before publishing."
                         : `Some ticket evidence was rejected. Replace the rejected files and request review again.${
@@ -2357,39 +2358,48 @@ export default function SellPage() {
                 </p>
               )}
 
-              <button
-                type="button"
-                onClick={handlePublishListing}
-                disabled={
-                  isSubmitting || (!hasPendingSubmission && isFetchingEvents)
-                }
-                className="mt-6 w-full py-3 rounded-lg text-[14px] font-semibold disabled:opacity-70"
-                style={{ backgroundColor: "#FAFAF7", color: "#111111" }}
-              >
-                {isSubmitting
-                  ? "Working…"
-                  : sellStep === "review"
-                    ? "Publish listing"
-                    : sellStep === "details"
-                    ? pendingCreatePayload
-                      ? "Retry saving details"
-                      : "Continue to ticket uploads"
-                    : manualReviewStatus === "pending"
-                      ? "Check review status"
-                      : manualReviewStatus === "approved"
-                        ? "Confirm listing details"
-                        : Object.values(ticketSlotStatuses).includes(
-                              "processing",
-                            )
-                          ? "Refresh ticket status"
-                          : pendingListingId
-                            ? verifiedTicketSlots.length === qty
-                              ? "Review listing and set price"
-                              : "Upload and verify tickets"
-                            : pendingCreatePayload
-                              ? "Retry listing creation"
-                              : "Publish listing"}
-              </button>
+              {sellStep === "uploads" &&
+              manualReviewStatus === "pending" ? (
+                <Link
+                  href="/account/my-listings"
+                  className="mt-6 block w-full rounded-lg py-3 text-center text-[14px] font-semibold"
+                  style={{ backgroundColor: "#FAFAF7", color: "#111111" }}
+                >
+                  Go to seller workspace
+                </Link>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handlePublishListing}
+                  disabled={
+                    isSubmitting || (!hasPendingSubmission && isFetchingEvents)
+                  }
+                  className="mt-6 w-full py-3 rounded-lg text-[14px] font-semibold disabled:opacity-70"
+                  style={{ backgroundColor: "#FAFAF7", color: "#111111" }}
+                >
+                  {isSubmitting
+                    ? "Working…"
+                    : sellStep === "review"
+                      ? "Publish listing"
+                      : sellStep === "details"
+                        ? pendingCreatePayload
+                          ? "Retry saving details"
+                          : "Continue to ticket uploads"
+                        : manualReviewStatus === "approved"
+                          ? "Confirm listing details"
+                          : Object.values(ticketSlotStatuses).includes(
+                                "processing",
+                              )
+                            ? "Refresh ticket status"
+                            : pendingListingId
+                              ? verifiedTicketSlots.length === qty
+                                ? "Review listing and set price"
+                                : "Upload and verify tickets"
+                              : pendingCreatePayload
+                                ? "Retry listing creation"
+                                : "Publish listing"}
+                </button>
+              )}
               {pendingListingId &&
               !manualReviewSubmitted &&
               manualReviewStatus !== "approved" &&

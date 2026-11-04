@@ -16,6 +16,7 @@ export type ListingSummary = {
   status: ListingStatus
   manualReviewStatus?: ManualListingReviewStatus
   manualReviewNote?: string | null
+  publicationBlockers?: string[]
   venue: string
   ticketCategory?: string
   ticketType?: ListingTicketType
@@ -34,6 +35,7 @@ export type ListingDetail = {
   ticketDetails?: ListingTicketDetails | null
   manualReviewStatus?: ManualListingReviewStatus
   manualReviewNote?: string | null
+  publicationBlockers?: string[]
   createdAt?: string
   updatedAt?: string
 }

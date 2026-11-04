@@ -239,6 +239,10 @@ export async function getNotifications(): Promise<NotificationSummary[]> {
   return expectArray(result, "notifications").map((item) => {
     const notification = expectRecord(item, "notification")
     const data = asRecord(notification.data)
+    const event = requireString(notification, "event", "notification")
+    const listingId = data.listingId
+    const nextAction = data.nextAction
+    const reviewNote = data.reviewNote
     const details = Object.entries(data)
       .filter(
         ([key, value]) =>
@@ -253,15 +257,52 @@ export async function getNotifications(): Promise<NotificationSummary[]> {
           `${key.replace(/([A-Z])/g, " $1").toLowerCase()}: ${value}`,
       )
       .slice(0, 2)
+    const sellerReviewMessage = (() => {
+      switch (event) {
+        case "listing.manual_review.submitted":
+          return {
+            title: "Ticket review submitted",
+            body: "Your listing is not live while the ticket evidence is reviewed.",
+          }
+        case "listing.manual_review.approved":
+          return {
+            title: "Ticket review approved",
+            body:
+              typeof nextAction === "string"
+                ? `Complete this next step: ${nextAction}`
+                : "Your listing is ready for the next step.",
+          }
+        case "listing.manual_review.rejected":
+          return {
+            title: "Ticket evidence needs changes",
+            body:
+              typeof reviewNote === "string"
+                ? `${reviewNote} Replace the rejected file and resubmit it for review.`
+                : "Replace the rejected file and resubmit it for review.",
+          }
+        case "listing.published":
+          return {
+            title: "Your listing is live",
+            body: "Your listing is now published and visible to buyers.",
+          }
+        default:
+          return null
+      }
+    })()
     return {
       id: requireString(notification, "id", "notification"),
-      title: requireString(notification, "event", "notification")
-        .split(".")
-        .map((word) => word.replace(/_/g, " "))
-        .join(" "),
-      body: details.join(" · "),
+      title:
+        sellerReviewMessage?.title ??
+        event
+          .split(".")
+          .map((word) => word.replace(/_/g, " "))
+          .join(" "),
+      body: sellerReviewMessage?.body ?? details.join(" · "),
       read: notification.readAt !== null,
       createdAt: requireString(notification, "createdAt", "notification"),
+      ...(typeof listingId === "string"
+        ? { href: "/account/my-listings" }
+        : {}),
     }
   })
 }

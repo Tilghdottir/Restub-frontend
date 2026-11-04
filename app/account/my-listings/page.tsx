@@ -19,9 +19,13 @@ function hasSellerOrder(
 function listingStatusLabel(
   status: "draft" | "published" | "suspended" | "rejected",
   manualReviewStatus?: "not_submitted" | "pending" | "approved" | "rejected",
+  publicationBlockers: string[] = [],
 ): string {
   if (status === "published") return "Published"
-  if (manualReviewStatus === "pending") return "Awaiting staff review"
+  if (manualReviewStatus === "pending") return "Under review · not live"
+  if (manualReviewStatus === "approved" && publicationBlockers.length > 0) {
+    return "Approved · action needed"
+  }
   if (manualReviewStatus === "approved") return "Approved · ready to publish"
   if (manualReviewStatus === "rejected") return "Review rejected · replace evidence"
   if (status === "suspended") return "Suspended"
@@ -123,8 +127,16 @@ export default function MyListingsPage() {
                       {listingStatusLabel(
                         listing.status,
                         listing.manualReviewStatus,
+                        listing.publicationBlockers,
                       )}
                     </p>
+                    {listing.publicationBlockers?.length ? (
+                      <ul className="mt-2 list-inside list-disc space-y-1 text-[12px] text-[#6A5318]">
+                        {listing.publicationBlockers.map((blocker) => (
+                          <li key={blocker}>{blocker}</li>
+                        ))}
+                      </ul>
+                    ) : null}
                     {listing.manualReviewNote ? (
                       <p className="mt-2 text-[12px] text-[#8A3028]">
                         Reviewer note: {listing.manualReviewNote}
@@ -137,9 +149,13 @@ export default function MyListingsPage() {
                       className="shrink-0 rounded-lg bg-[#111111] px-4 py-2.5 text-center text-[12px] font-semibold text-[#FAFAF7]"
                     >
                       {listing.manualReviewStatus === "pending"
-                        ? "Check review status"
+                        ? "View review status"
                         : listing.manualReviewStatus === "approved"
-                          ? "Continue to publish"
+                          ? listing.publicationBlockers?.length
+                            ? "Complete next steps"
+                            : "Publish listing"
+                          : listing.manualReviewStatus === "rejected"
+                            ? "Replace rejected files"
                           : "Continue draft"}
                     </Link>
                   ) : (

@@ -283,6 +283,9 @@ export async function createListing(
         : {}),
       quantity: payload.quantity,
       price: payload.price,
+      ...(payload.priceConfirmed !== undefined
+        ? { priceConfirmed: payload.priceConfirmed }
+        : {}),
       ...(payload.partnerId ? { partnerId: payload.partnerId } : {}),
       ...(payload.partnerName ? { partnerName: payload.partnerName } : {}),
       ...(payload.partnerUrl ? { partnerUrl: payload.partnerUrl } : {}),

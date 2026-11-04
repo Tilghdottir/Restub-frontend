@@ -62,4 +62,5 @@ export type NotificationSummary = {
   body: string
   read: boolean
   createdAt: string
+  href?: string
 }

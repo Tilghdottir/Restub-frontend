@@ -32,6 +32,7 @@ export type CreateListingRequest = {
   description: string
   quantity: number
   price: number
+  priceConfirmed?: boolean
   ticketCategory?: string
   ticketType?: ListingTicketType
   ticketDetails?: ListingTicketDetails
@@ -163,6 +164,8 @@ export type ListingApiRecord = {
   eventVenue?: string
   manualReviewStatus?: ManualListingReviewStatus
   manualReviewNote?: string | null
+  priceConfirmed?: boolean
+  publicationBlockers?: string[]
   createdAt?: string
   updatedAt?: string
   deleted?: boolean
