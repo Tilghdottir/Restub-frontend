@@ -20,21 +20,23 @@ Restub is the ticket-resale product at `resale.co`: Next.js 15 App Router, React
 |---|---|---|
 | Routes | `app/**/page.tsx` | Screens |
 | Layout | `app/layout.tsx` | Root layout and `StoreProvider` |
-| Chrome | `app/components/` | `Header`, `AccountSidebar`, `AccountPageShell`, `ProtectedRoute`, `ApiErrorNotice` |
+| Chrome | `components/ui/`, `components/account/` | `Header`, `AccountSidebar`, `AccountPageShell`, `ProtectedRoute`, `ApiErrorNotice` |
+| Shared domain UI | `components/tickets/`, `components/events/` | Ticket and event components reused across routes |
 | Auth UI | `app/hooks/useAuth.ts` | Session state for chrome and `ProtectedRoute` |
-| API | `app/lib/` | Shared HTTP, domain clients/types/models, RTK endpoints and store |
-| Static catalog | `app/lib/data.ts` | `EVENTS` used by `/events/[id]` |
+| API | `lib/` | Shared HTTP, domain clients/types/models, RTK endpoints and store |
+| Static catalog | `lib/data.ts` | `EVENTS` used by `/events/[id]` |
 | Visual guidance | `guidelines/Guidelines.md` | Palette, typography, and chrome |
 
 ## Routing and UI
 
-- Use `Header` for marketplace pages. Use `AccountSidebar` for account/admin pages; keep `AccountPageShell` where already used.
+- Use `components/ui/Header` for marketplace pages. Use `components/account/AccountSidebar` for account/admin pages; keep `components/account/AccountPageShell` where already used.
+- Keep genuinely reused ticket and event presentation in their respective `components/tickets/` and `components/events/` domains; keep one-off route UI under its route's `_components/`.
 - Pages using hooks or RTK must be Client Components (`"use client"`). Server Components use domain `client.ts` only; never import RTK hooks there.
 - In Next.js 15 pages, `params` and `searchParams` are Promises; await them before reading route values.
 - `/listings/[id]` loads a live listing through its domain client. `/events/[id]` uses static `EVENTS` and `generateStaticParams`. Do not mix these sources unless requested.
 - `ProtectedRoute` is a client-side sign-in gate. There is no auth middleware; do not add server session checks without cookie-based sessions.
 - Admin pages live in `app/admin/`. Read `admin`, `superadmin`, and `developer` from `/auth/me`; match admin route gates to backend role/permission guards, and never treat client checks as API security.
-- Show API errors with `ApiErrorNotice` and `getApiErrorMessage` from `app/lib/rtk-api.ts`.
+- Show API errors with `ApiErrorNotice` and `getApiErrorMessage` from `lib/rtk-api.ts`.
 
 ## Styling
 
@@ -44,7 +46,7 @@ Restub is the ticket-resale product at `resale.co`: Next.js 15 App Router, React
 
 ## API layer
 
-- Use the shared HTTP stack: `app/lib/api/http.ts` (`request`) and `app/lib/auth/request.ts` (`authenticatedRequest`); do not add another fetch wrapper or `createApi`.
+- Use the shared HTTP stack: `lib/api/http.ts` (`request`) and `lib/auth/request.ts` (`authenticatedRequest`); do not add another fetch wrapper or `createApi`.
 - `http.ts` handles transport only: no tokens, refresh, or redirects. Browser requests use the same-origin Next API proxy and HttpOnly cookies; authenticated requests handle refresh. `useAuth` derives session state from `/auth/me`.
 - Keep domain code together: `types.ts` for wire contracts, `models.ts` for UI models, `client.ts` for requests and boundary parsing, `rtk.ts` for RTK hooks and tags.
 - Pages use RTK hooks; Server Components use domain `client.ts`. Inject endpoints into the shared `rtkApi`.
@@ -56,7 +58,7 @@ Restub is the ticket-resale product at `resale.co`: Next.js 15 App Router, React
 
 ## State and product data
 
-- Redux is for RTK Query only (`app/lib/store.ts`, `StoreProvider`). Do not add unrelated slices without a concrete global-state need; auth session state is derived from `/auth/me` through `useAuth`.
+- Redux is for RTK Query only (`lib/store.ts`, `components/ui/StoreProvider`). Do not add unrelated slices without a concrete global-state need; auth session state is derived from `/auth/me` through `useAuth`.
 - Listings, checkout, orders, KYC, payouts, and account data come from the API.
 - The homepage adapts API listings to the static `Event` shape in `data.ts`; event detail pages may still use mock `EVENTS`. Do not silently redirect event routes to listing data.
 

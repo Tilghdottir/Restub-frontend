@@ -1,5 +1,5 @@
 import { type NextRequest } from "next/server"
-import { API_BASE_URL } from "../../lib/api/http"
+import { API_BASE_URL } from "../../../lib/api/http"
 
 type RouteContext = {
   params: Promise<{ path: string[] }>
