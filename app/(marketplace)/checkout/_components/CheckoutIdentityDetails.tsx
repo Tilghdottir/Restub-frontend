@@ -1,6 +1,10 @@
 export type CheckoutIdType = "bvn" | "nin"
+interface CheckoutIdOption {
+  value: CheckoutIdType
+  label: string
+}
 
-const ID_TYPES: Array<{ value: CheckoutIdType; label: string }> = [
+const ID_TYPES: CheckoutIdOption[] = [
   { value: "nin", label: "National Identity Number" },
   { value: "bvn", label: "Bank Verification Number (BVN)" },
 ]

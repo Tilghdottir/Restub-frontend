@@ -4,7 +4,6 @@ import Link from "next/link"
 import AccountSidebar from "../../../../../components/account/AccountSidebar"
 import { useEffect, useState } from "react"
 import { useAuth } from "../../../../hooks/useAuth"
-import { formatNaira } from "../../../../../lib/money"
 import { getApiErrorMessage } from "../../../../../lib/rtk-api"
 import {
   useAcceptOrderDeliveryMutation,
@@ -17,8 +16,8 @@ import {
 import { useOpenDisputeMutation } from "../../../../../lib/disputes/rtk"
 import { getSupportMailto } from "../../../../../lib/support"
 import PurchaseOrderOverview from "./_components/PurchaseOrderOverview"
+import PurchaseDeliveryEscrow from "./_components/PurchaseDeliveryEscrow"
 import PurchaseTicketProblem from "./_components/PurchaseTicketProblem"
-import ManualTicketDeliverySlots from "./_components/ManualTicketDeliverySlots"
 
 export default function PurchaseDetailContent({
   orderId,
@@ -135,6 +134,32 @@ export default function PurchaseDetailContent({
     return () => clearInterval(interval)
   }, [canCheckEscrow, escrowPending, refetchEscrow])
 
+  const handleAcceptDelivery = async () => {
+    if (!order) return
+    setActionError("")
+    setActionMessage("")
+    try {
+      await acceptDelivery(order.id).unwrap()
+      setActionMessage("Delivery accepted.")
+    } catch (reason) {
+      setActionError(getApiErrorMessage(reason, "Unable to accept delivery."))
+    }
+  }
+
+  const handleReleaseEscrow = async () => {
+    if (!order) return
+    setActionError("")
+    setActionMessage("")
+    try {
+      await releaseEscrow({ orderId: order.id }).unwrap()
+      setActionMessage(
+        "Release started. The provider may take time to confirm settlement.",
+      )
+    } catch (reason) {
+      setActionError(getApiErrorMessage(reason, "Unable to release escrow."))
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="min-h-screen" style={{ backgroundColor: "#FAFAF7" }}>
@@ -182,167 +207,34 @@ export default function PurchaseDetailContent({
         <PurchaseOrderOverview order={order} />
 
         {(order.manualDelivery || canCheckEscrow) && (
-          <section
-            className="mt-6 bg-white border rounded-lg p-6"
-            style={{ borderColor: "#E8E9EB" }}
-          >
-            <h2
-              className="text-[16px] font-semibold"
-              style={{ color: "#111111" }}
-            >
-              Delivery and escrow
-            </h2>
-            {order.manualDelivery && (
-              <p className="text-[13px] mt-2" style={{ color: "#292B2F" }}>
-                {order.manualDeliveryAcceptedAt
-                  ? `Delivery accepted ${new Date(order.manualDeliveryAcceptedAt).toLocaleString()}.`
-                  : order.manualDeliverySubmittedAt
-                    ? delivery?.tickets.length === order.quantity
-                      ? "Your tickets are ready to download below. Review the files and accept delivery when satisfied."
-                      : "The seller submitted the tickets. Secure download links are being prepared."
-                    : "Waiting for the seller to deliver the tickets."}
-              </p>
-            )}
-            {isBuyer && !order.manualDelivery && canCheckEscrow && (
-              <p className="text-[13px] mt-2" style={{ color: "#292B2F" }}>
-                This order uses email delivery. Check the inbox for the address
-                used at checkout, including its spam folder, for your ticket.
-              </p>
-            )}
-            {canCheckEscrow && (
-              <p className="text-[13px] mt-2" style={{ color: "#292B2F" }}>
-                Escrow status:{" "}
-                {escrow?.escrowStatus.replace(/_/g, " ") ??
-                  (checkingEscrow ? "checking…" : "unavailable")}
-                {escrow?.releaseStatus
-                  ? ` · Release: ${escrow.releaseStatus.replace(/_/g, " ")}`
-                  : ""}
-                {escrow?.refundStatus
-                  ? ` · Refund: ${escrow.refundStatus.replace(/_/g, " ")}`
-                  : ""}
-              </p>
-            )}
-            {escrowError && (
-              <p role="alert" className="text-[13px] mt-2 text-red-800">
-                {getApiErrorMessage(
-                  escrowError,
-                  "Unable to load escrow status.",
-                )}
-              </p>
-            )}
-            {deliveryError && (
-              <p role="alert" className="text-[13px] mt-2 text-red-800">
-                {getApiErrorMessage(
-                  deliveryError,
-                  "Unable to load delivered ticket files.",
-                )}
-              </p>
-            )}
-            {delivery?.tickets.map((ticket) => (
-              <a
-                key={ticket.slotIndex}
-                href={ticket.url}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex mt-3 mr-3 text-[13px] underline underline-offset-2"
-                style={{ color: "#111111" }}
-              >
-                Download ticket {ticket.slotIndex}
-              </a>
-            ))}
-            {isSeller &&
-              order.manualDelivery &&
-              order.status === "paid" &&
-              !order.manualDeliverySubmittedAt && (
-                <ManualTicketDeliverySlots
-                  quantity={order.quantity}
-                  ticketDeliveries={order.ticketDeliveries}
-                  files={deliveryFiles}
-                  uploadingSlot={uploadingSlot}
-                  onFileChange={(slot, file) =>
-                    setDeliveryFiles((current) => {
-                      const next = { ...current }
-                      if (file) next[slot] = file
-                      else delete next[slot]
-                      return next
-                    })
-                  }
-                  onUpload={(slot) => void uploadDeliveryTicket(slot)}
-                />
-              )}
-            {actionError && (
-              <p role="alert" className="text-[13px] text-red-800 mt-3">
-                {actionError}
-              </p>
-            )}
-            {actionMessage && (
-              <p role="status" className="text-[13px] text-green-800 mt-3">
-                {actionMessage}
-              </p>
-            )}
-            <div className="flex flex-wrap gap-3 mt-4">
-              {isBuyer &&
-                order.manualDelivery &&
-                order.status === "paid" &&
-                order.manualDeliverySubmittedAt &&
-                !order.manualDeliveryAcceptedAt && (
-                  <button
-                    type="button"
-                    disabled={accepting}
-                    onClick={async () => {
-                      setActionError("")
-                      setActionMessage("")
-                      try {
-                        await acceptDelivery(order.id).unwrap()
-                        setActionMessage("Delivery accepted.")
-                      } catch (reason) {
-                        setActionError(
-                          getApiErrorMessage(
-                            reason,
-                            "Unable to accept delivery.",
-                          ),
-                        )
-                      }
-                    }}
-                    className="px-5 py-3 rounded-lg text-[13px] font-semibold disabled:opacity-60"
-                    style={{ backgroundColor: "#111111", color: "#FAFAF7" }}
-                  >
-                    {accepting ? "Accepting…" : "Accept ticket delivery"}
-                  </button>
-                )}
-              {isSeller &&
-                canCheckEscrow &&
-                escrow?.escrowStatus === "hold" && (
-                  <button
-                    type="button"
-                    disabled={releasing || escrow.releaseStatus === "pending"}
-                    onClick={async () => {
-                      setActionError("")
-                      setActionMessage("")
-                      try {
-                        await releaseEscrow({ orderId: order.id }).unwrap()
-                        setActionMessage(
-                          "Release started. The provider may take time to confirm settlement.",
-                        )
-                      } catch (reason) {
-                        setActionError(
-                          getApiErrorMessage(
-                            reason,
-                            "Unable to release escrow.",
-                          ),
-                        )
-                      }
-                    }}
-                    className="px-5 py-3 rounded-lg text-[13px] font-semibold disabled:opacity-60"
-                    style={{ backgroundColor: "#111111", color: "#FAFAF7" }}
-                  >
-                    {releasing || escrow.releaseStatus === "pending"
-                      ? "Release pending…"
-                      : "Release escrow"}
-                  </button>
-                )}
-            </div>
-          </section>
+          <PurchaseDeliveryEscrow
+            order={order}
+            isBuyer={isBuyer}
+            isSeller={isSeller}
+            canCheckEscrow={canCheckEscrow}
+            escrow={escrow}
+            checkingEscrow={checkingEscrow}
+            escrowError={escrowError}
+            delivery={delivery}
+            deliveryError={deliveryError}
+            deliveryFiles={deliveryFiles}
+            uploadingSlot={uploadingSlot}
+            actionError={actionError}
+            actionMessage={actionMessage}
+            accepting={accepting}
+            releasing={releasing}
+            onFileChange={(slot, file) =>
+              setDeliveryFiles((current) => {
+                const next = { ...current }
+                if (file) next[slot] = file
+                else delete next[slot]
+                return next
+              })
+            }
+            onUpload={(slot) => void uploadDeliveryTicket(slot)}
+            onAcceptDelivery={() => void handleAcceptDelivery()}
+            onReleaseEscrow={() => void handleReleaseEscrow()}
+          />
         )}
         {isBuyer && (
           <PurchaseTicketProblem

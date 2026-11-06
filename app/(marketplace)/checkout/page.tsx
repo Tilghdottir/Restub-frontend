@@ -14,13 +14,12 @@ import { useParams, useRouter, useSearchParams } from "next/navigation"
 import { Suspense, useEffect, useRef, useState } from "react"
 import BrandLogo from "../../../components/ui/BrandLogo"
 import Header from "../../../components/ui/Header"
+import CheckoutProgressHeader from "./_components/CheckoutProgressHeader"
 import CheckoutOrderSummary from "./_components/CheckoutOrderSummary"
 import CheckoutOrderConfirmation from "./_components/CheckoutOrderConfirmation"
 import CheckoutReviewSection from "./_components/CheckoutReviewSection"
-import CheckoutIdentityDetails, {
-  type CheckoutIdType,
-} from "./_components/CheckoutIdentityDetails"
-import CheckoutContactFields from "./_components/CheckoutContactFields"
+import CheckoutContactStep from "./_components/CheckoutContactStep"
+import type { CheckoutIdType } from "./_components/CheckoutIdentityDetails"
 import { useAuth } from "../../hooks/useAuth"
 import { getApiErrorMessage } from "../../../lib/rtk-api"
 import { useLazyGetListingByIdQuery } from "../../../lib/listings/rtk"
@@ -362,48 +361,7 @@ function CheckoutPageContent() {
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: "#FAFAF7" }}>
-      <header className="bg-white border-b" style={{ borderColor: "#E8E9EB" }}>
-        <div className="max-w-4xl mx-auto px-6 h-14 flex items-center gap-4">
-          <BrandLogo width={120} height={28} />
-          {step < 3 && (
-            <>
-              <span
-                className="w-px h-4 mx-2"
-                style={{ backgroundColor: "#E8E9EB" }}
-              />
-              <div className="flex items-center gap-3">
-                {STEPS.slice(0, 2).map((label, index) => (
-                  <div key={label} className="flex items-center gap-2">
-                    <div
-                      className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-semibold shrink-0 transition-colors"
-                      style={
-                        index < step
-                          ? { backgroundColor: "#111111", color: "#FAFAF7" }
-                          : index === step
-                            ? { backgroundColor: "#111111", color: "#FAFAF7" }
-                            : { backgroundColor: "#E8E9EB", color: "#292B2F" }
-                      }
-                    >
-                      {index < step ? "✓" : index + 1}
-                    </div>
-                    <span
-                      className="text-[12px] font-medium hidden sm:inline"
-                      style={{ color: index <= step ? "#111111" : "#292B2F" }}
-                    >
-                      {label}
-                    </span>
-                    {index < 2 && (
-                      <span className="text-[#E8E9EB] mx-1 hidden sm:inline">
-                        ›
-                      </span>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
-        </div>
-      </header>
+      <CheckoutProgressHeader step={step} steps={STEPS} />
 
       <div className="max-w-4xl mx-auto px-6 py-8">
         {step === 2 ? (
@@ -429,133 +387,57 @@ function CheckoutPageContent() {
               )}
 
               {step === 1 && (
-                <div>
-                  <button
-                    type="button"
-                    onClick={() => setStep(0)}
-                    className="flex items-center gap-1.5 text-[13px] font-medium mb-6 hover:opacity-70 transition-opacity text-[#292B2F]"
-                  >
-                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                      <path
-                        d="M9 11L5 7L9 3"
-                        stroke="currentColor"
-                        strokeWidth="1.3"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
-                    Back to review
-                  </button>
-
-                  <h1 className="text-xl font-bold mb-6 text-[#111111]">
-                    Contact Details
-                  </h1>
-
-                  <form onSubmit={handleDetails} className="space-y-4">
-                    <CheckoutContactFields
-                      firstName={firstName}
-                      lastName={lastName}
-                      email={customerEmail}
-                      phone={phone}
-                      errors={errors}
-                      onFirstNameChange={(value) => {
-                        resetIdempotencyKey()
-                        setFirstName(value)
-                      }}
-                      onLastNameChange={(value) => {
-                        resetIdempotencyKey()
-                        setLastName(value)
-                      }}
-                      onEmailChange={(value) => {
-                        resetIdempotencyKey()
-                        setCustomerEmail(value)
-                      }}
-                      onPhoneChange={(value) => {
-                        resetIdempotencyKey()
-                        setPhone(value)
-                      }}
-                    />
-
-                    <CheckoutIdentityDetails
-                      authChecked={authChecked}
-                      isAuthenticated={isAuthenticated}
-                      identityRequired={identityRequired}
-                      idType={id_type}
-                      dateOfBirth={dateOfBirth}
-                      idNumber={id_number}
-                      identityConsent={identityConsent}
-                      errors={errors}
-                      onIdTypeChange={(value) => {
-                        resetIdempotencyKey()
-                        setIdType(value)
-                      }}
-                      onDateOfBirthChange={(value) => {
-                        resetIdempotencyKey()
-                        setDateOfBirth(value)
-                      }}
-                      onIdNumberChange={(value) => {
-                        resetIdempotencyKey()
-                        setIdNumber(value.replace(/\D/g, "").slice(0, 11))
-                      }}
-                      onIdentityConsentChange={(value) => {
-                        resetIdempotencyKey()
-                        setIdentityConsent(value)
-                      }}
-                    />
-
-                    {submitError && (
-                      <div
-                        className="rounded-lg border px-3 py-2 text-[12px]"
-                        style={{
-                          backgroundColor: "#FAFAF7",
-                          borderColor: "#E8E9EB",
-                          color: "#292B2F",
-                        }}
-                      >
-                        {submitError}
-                        {accountKycRequired && (
-                          <Link
-                            href="/kyc"
-                            className="ml-1 font-semibold underline underline-offset-2"
-                          >
-                            Complete account verification
-                          </Link>
-                        )}
-                      </div>
-                    )}
-
-                    {!authChecked ? (
-                      <button
-                        type="submit"
-                        disabled={!authChecked}
-                        className="w-full py-3 rounded-lg text-[14px] font-semibold disabled:opacity-60"
-                        style={{ backgroundColor: "#111111", color: "#FAFAF7" }}
-                      >
-                        Checking account…
-                      </button>
-                    ) : (
-                      <div className="space-y-2 text-center">
-                        <button
-                          type="submit"
-                          disabled={loading}
-                          className="w-full py-3 rounded-lg text-[14px] font-semibold disabled:opacity-60"
-                          style={{
-                            backgroundColor: "#111111",
-                            color: "#FAFAF7",
-                          }}
-                        >
-                          {loading
-                            ? "Starting checkout…"
-                            : "Continue to secure checkout"}
-                        </button>
-                        <p className="text-[11px] text-[#8A8D91]">
-                          You’ll continue with the payment provider selected for
-                          this checkout.
-                        </p>
-                      </div>
-                    )}
-                  </form>
-                </div>
+                <CheckoutContactStep
+                  firstName={firstName}
+                  lastName={lastName}
+                  email={customerEmail}
+                  phone={phone}
+                  idType={id_type}
+                  dateOfBirth={dateOfBirth}
+                  idNumber={id_number}
+                  identityConsent={identityConsent}
+                  authChecked={authChecked}
+                  isAuthenticated={isAuthenticated}
+                  identityRequired={identityRequired}
+                  errors={errors}
+                  submitError={submitError}
+                  accountKycRequired={accountKycRequired}
+                  loading={loading}
+                  onBack={() => setStep(0)}
+                  onSubmit={handleDetails}
+                  onFirstNameChange={(value) => {
+                    resetIdempotencyKey()
+                    setFirstName(value)
+                  }}
+                  onLastNameChange={(value) => {
+                    resetIdempotencyKey()
+                    setLastName(value)
+                  }}
+                  onEmailChange={(value) => {
+                    resetIdempotencyKey()
+                    setCustomerEmail(value)
+                  }}
+                  onPhoneChange={(value) => {
+                    resetIdempotencyKey()
+                    setPhone(value)
+                  }}
+                  onIdTypeChange={(value) => {
+                    resetIdempotencyKey()
+                    setIdType(value)
+                  }}
+                  onDateOfBirthChange={(value) => {
+                    resetIdempotencyKey()
+                    setDateOfBirth(value)
+                  }}
+                  onIdNumberChange={(value) => {
+                    resetIdempotencyKey()
+                    setIdNumber(value.replace(/\D/g, "").slice(0, 11))
+                  }}
+                  onIdentityConsentChange={(value) => {
+                    resetIdempotencyKey()
+                    setIdentityConsent(value)
+                  }}
+                />
               )}
             </div>
 

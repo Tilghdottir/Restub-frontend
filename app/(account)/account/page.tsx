@@ -2,16 +2,15 @@
 
 import Link from "next/link"
 import { useMemo, useState } from "react"
-import AccountPageShell, {
-  ResourceCard,
-} from "../../../components/account/AccountPageShell"
+import AccountPageShell from "../../../components/account/AccountPageShell"
 import ApiErrorNotice from "../../../components/ui/ApiErrorNotice"
 import AccountSummaryCard from "./_components/AccountSummaryCard"
+import AccountActionRequired from "./_components/AccountActionRequired"
 import DashboardActivitySection from "./_components/DashboardActivitySection"
 import DashboardMoneyDetails from "./_components/DashboardMoneyDetails"
 import DashboardPayoutSummary from "./_components/DashboardPayoutSummary"
 import DashboardTicketSection from "./_components/DashboardTicketSection"
-import { formatAccountDate } from "./_components/DashboardTicketRow"
+import NextEventSummary from "./_components/NextEventSummary"
 import {
   useGetDashboardTicketsQuery,
   useGetNotificationsQuery,
@@ -175,94 +174,16 @@ export default function AccountPage() {
         />
       ) : null}
 
-      {urgentItems.length > 0 || payoutBlocked ? (
-        <section
-          aria-label="Action required"
-          className="mb-5 overflow-hidden rounded-lg border border-[#E8C6C1] bg-[#FFF6F4]"
-        >
-          <div className="px-4 py-3 text-[12px] font-semibold uppercase tracking-wide text-[#8A3028]">
-            Action required
-          </div>
-          <ul className="divide-y divide-[#E8C6C1]">
-            {urgentItems.map((ticket) => (
-              <li
-                key={`${ticket.id}-attention`}
-                className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 text-[13px] text-[#292B2F]"
-              >
-                <span>{ticket.attention}</span>
-                {ticket.actionHref ? (
-                  <Link
-                    href={ticket.actionHref}
-                    className="font-medium underline underline-offset-2"
-                  >
-                    View details
-                  </Link>
-                ) : null}
-              </li>
-            ))}
-            {payoutBlocked ? (
-              <li className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 text-[13px] text-[#292B2F]">
-                <span>Your payout account needs attention.</span>
-                <Link
-                  href="/payout-account"
-                  className="font-medium underline underline-offset-2"
-                >
-                  Review payout setup
-                </Link>
-              </li>
-            ) : null}
-          </ul>
-        </section>
-      ) : null}
+      <AccountActionRequired
+        items={urgentItems}
+        payoutBlocked={payoutBlocked}
+      />
 
       <section
         aria-label="Account summary"
         className="-mx-6 mb-7 flex snap-x gap-3 overflow-x-auto px-6 pb-2 sm:mx-0 sm:grid sm:grid-cols-2 sm:overflow-visible sm:px-0 sm:pb-0 lg:grid-cols-4"
       >
-        <div className="min-w-[250px] snap-start sm:min-w-0">
-          <ResourceCard>
-            <p className="text-[11px] uppercase tracking-wide text-[#292B2F]">
-              Next event
-            </p>
-            {nextEvent ? (
-              <>
-                <h2 className="mt-2 truncate text-[15px] font-semibold text-[#111111]">
-                  {nextEvent.eventTitle}
-                </h2>
-                <p className="mt-1 text-[12px] text-[#292B2F]">
-                  {formatAccountDate(nextEvent.eventDate)}
-                </p>
-                <p className="mt-1 truncate text-[12px] text-[#292B2F]">
-                  {nextEvent.venue ?? "Venue to be confirmed"} ·{" "}
-                  {nextEventLabel(nextEvent.eventDate)}
-                </p>
-                <Link
-                  href={
-                    nextEvent.actionHref ??
-                    (nextEvent.orderId
-                      ? `/account/purchases/${encodeURIComponent(nextEvent.orderId)}`
-                      : "/order")
-                  }
-                  className="mt-3 inline-block text-[12px] font-semibold underline underline-offset-2"
-                >
-                  Open ticket
-                </Link>
-              </>
-            ) : (
-              <>
-                <h2 className="mt-2 text-[15px] font-semibold text-[#111111]">
-                  No upcoming event
-                </h2>
-                <Link
-                  href="/"
-                  className="mt-3 inline-block text-[12px] font-semibold underline underline-offset-2"
-                >
-                  Find events
-                </Link>
-              </>
-            )}
-          </ResourceCard>
-        </div>
+        <NextEventSummary event={nextEvent} relativeDate={nextEventLabel} />
         <AccountSummaryCard
           label="Tickets owned"
           value={ticketsLoading ? "…" : String(ticketsOwned)}

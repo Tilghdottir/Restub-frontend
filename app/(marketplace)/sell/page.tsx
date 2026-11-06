@@ -7,6 +7,8 @@ import TicketUploadSection from "./_components/TicketUploadSection"
 import ConfirmedTicketDetails from "./_components/ConfirmedTicketDetails"
 import ManualEventFields from "./_components/ManualEventFields"
 import ManualPartnerFields from "./_components/ManualPartnerFields"
+import PartnerSelector from "./_components/PartnerSelector"
+import CatalogEventSelector from "./_components/CatalogEventSelector"
 import AccountSidebar from "../../../components/account/AccountSidebar"
 import ApiErrorNotice from "../../../components/ui/ApiErrorNotice"
 import { ProtectedRoute } from "../../../components/ui/ProtectedRoute"
@@ -1096,80 +1098,26 @@ export default function SellPage() {
                     className="bg-white border rounded-lg p-5"
                     style={{ borderColor: "#E8E9EB" }}
                   >
-                    {partnersError ? (
-                      <>
-                        <ApiErrorNotice
-                          error={partnersError}
-                          fallback="Unable to load event partners."
-                        />
-                        <button
-                          type="button"
-                          onClick={() => void refetchPartners()}
-                          className="mb-4 text-[12px] underline"
-                          style={{ color: "#111111" }}
-                        >
-                          Retry loading partners
-                        </button>
-                      </>
-                    ) : null}
-                    {isLoadingPartners ? (
-                      <p
-                        className="mb-4 text-[12px]"
-                        style={{ color: "#292B2F" }}
-                      >
-                        Loading event partners…
-                      </p>
-                    ) : null}
                     <h2
                       className="text-[12px] font-semibold uppercase tracking-wide mb-4"
                       style={{ color: "#111111" }}
                     >
                       Event
                     </h2>
-                    <label
-                      htmlFor="partner-select"
-                      className="block text-[12px] font-medium mb-1.5"
-                      style={{ color: "#111111" }}
-                    >
-                      Select ticket partner
-                    </label>
-                    <select
-                      id="partner-select"
+                    <PartnerSelector
+                      partners={partners}
+                      selectedPartner={selectedPartner}
                       value={partnerId}
                       disabled={isFormLocked}
-                      onChange={(e) => {
+                      isLoading={isLoadingPartners}
+                      error={partnersError}
+                      onRetry={() => void refetchPartners()}
+                      onChange={(value) => {
                         setMatchedPartner(null)
-                        setPartnerId(e.target.value)
+                        setPartnerId(value)
                         setEventId("")
                       }}
-                      className="w-full border rounded-lg px-4 py-2.5 text-[14px] focus:outline-none focus:ring-1"
-                      style={{
-                        backgroundColor: "#FAFAF7",
-                        borderColor: "#E8E9EB",
-                        color: "#111111",
-                      }}
-                    >
-                      <option value="">--- Select partner ---</option>
-                      {selectedPartner &&
-                      !partners.some(
-                        (partner) => partner.id === selectedPartner.id,
-                      ) ? (
-                        <option
-                          key={selectedPartner.id}
-                          value={selectedPartner.id}
-                        >
-                          {selectedPartner.name}
-                        </option>
-                      ) : null}
-                      {partners.map((partner) => (
-                        <option key={partner.id} value={String(partner.id)}>
-                          {partner.name}
-                        </option>
-                      ))}
-                      <option value={MANUAL_SELECTION}>
-                        Other / enter partner
-                      </option>
-                    </select>
+                    />
 
                     {isManualPartner ? (
                       <ManualPartnerFields
@@ -1208,63 +1156,16 @@ export default function SellPage() {
                       />
                     ) : null}
 
-                    {eventsError ? (
-                      <>
-                        <ApiErrorNotice
-                          error={eventsError}
-                          fallback="Unable to load events."
-                        />
-                        <button
-                          type="button"
-                          onClick={() => void refetchEvents()}
-                          className="mb-4 text-[12px] underline"
-                          style={{ color: "#111111" }}
-                        >
-                          Retry loading events
-                        </button>
-                      </>
-                    ) : null}
-                    {isFetchingEvents ? (
-                      <p
-                        className="mt-3 text-[12px]"
-                        style={{ color: "#292B2F" }}
-                      >
-                        Loading events…
-                      </p>
-                    ) : null}
-                    {selectedPartner ? (
-                      <>
-                        <label
-                          htmlFor="catalog-event"
-                          className="block text-[12px] font-medium mt-4 mb-1.5"
-                          style={{ color: "#111111" }}
-                        >
-                          Select catalog event
-                        </label>
-                        <select
-                          id="catalog-event"
-                          value={eventId}
-                          disabled={isFetchingEvents || isFormLocked}
-                          onChange={(e) => setEventId(e.target.value)}
-                          className="w-full border rounded-lg px-4 py-2.5 text-[14px] focus:outline-none focus:ring-1"
-                          style={{
-                            backgroundColor: "#FAFAF7",
-                            borderColor: "#E8E9EB",
-                            color: "#111111",
-                          }}
-                        >
-                          <option value="">--- Select event ---</option>
-                          {events.map((event) => (
-                            <option key={event.id} value={String(event.id)}>
-                              {event.name}
-                            </option>
-                          ))}
-                          <option value={MANUAL_SELECTION}>
-                            Other / enter event
-                          </option>
-                        </select>
-                      </>
-                    ) : null}
+                    <CatalogEventSelector
+                      events={events}
+                      selectedPartner={Boolean(selectedPartner)}
+                      value={eventId}
+                      disabled={isFormLocked}
+                      isFetching={isFetchingEvents}
+                      error={eventsError}
+                      onRetry={() => void refetchEvents()}
+                      onChange={setEventId}
+                    />
 
                     {isManualEvent ? (
                       <ManualEventFields
