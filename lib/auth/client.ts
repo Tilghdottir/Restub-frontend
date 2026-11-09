@@ -1,5 +1,6 @@
 import { isStaffPermission, isStaffRole, type AuthUserResponse } from "./types"
 import { authenticatedRequest } from "./request"
+import { ApiError } from "../api/http"
 import { expectRecord, requireString } from "../api/parse"
 
 export async function login(email: string, password: string): Promise<void> {
@@ -40,11 +41,19 @@ export async function logout(): Promise<void> {
   })
 }
 
-export async function getCurrentUser(): Promise<AuthUserResponse> {
-  const result = expectRecord(
-    await authenticatedRequest<unknown>("/auth/me"),
-    "current user",
-  )
+export async function getCurrentUser(): Promise<AuthUserResponse | null> {
+  try {
+    return parseAuthUserResponse(
+      await authenticatedRequest<unknown>("/auth/me"),
+    )
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 401) return null
+    throw error
+  }
+}
+
+export function parseAuthUserResponse(value: unknown): AuthUserResponse {
+  const result = expectRecord(value, "current user")
   const profile: AuthUserResponse = {
     sub: requireString(result, "sub", "current user"),
     email: requireString(result, "email", "current user"),

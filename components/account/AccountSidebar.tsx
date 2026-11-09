@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
-import { useAuth } from "../../app/hooks/useAuth"
+import { useAuth } from "../../lib/auth/useAuth"
 import { useLogoutMutation } from "../../lib/auth/rtk"
 import BrandLogo from "../ui/BrandLogo"
 import Header from "../ui/Header"

@@ -68,6 +68,11 @@ export async function getListings(
       "Invalid API response: pagination.hasMore must be a boolean.",
     )
   }
+  if (hasMore && (typeof nextCursor !== "string" || nextCursor.length === 0)) {
+    throw new Error(
+      "Invalid API response: pagination.nextCursor is required when more listings are available.",
+    )
+  }
   return {
     items,
     nextCursor: typeof nextCursor === "string" ? nextCursor : null,

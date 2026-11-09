@@ -43,6 +43,7 @@ export default function BrowsePage() {
   const [nextCursor, setNextCursor] = useState<string | null>(null)
   const [hasMore, setHasMore] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [loadMoreError, setLoadMoreError] = useState<string | null>(null)
   const [fetchListings, { isLoading }] = useLazyGetListingsQuery()
 
   useEffect(() => {
@@ -69,7 +70,7 @@ export default function BrowsePage() {
   const loadMore = async () => {
     if (!nextCursor || isLoadingMore) return
     setIsLoadingMore(true)
-    setErrorMessage(null)
+    setLoadMoreError(null)
     try {
       const result = await fetchListings({
         limit: 24,
@@ -79,9 +80,7 @@ export default function BrowsePage() {
       setNextCursor(result.nextCursor)
       setHasMore(result.hasMore)
     } catch (error) {
-      setErrorMessage(
-        getApiErrorMessage(error, "Unable to load more listings."),
-      )
+      setLoadMoreError(getApiErrorMessage(error, "Please try again."))
     } finally {
       setIsLoadingMore(false)
     }
@@ -105,7 +104,7 @@ export default function BrowsePage() {
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
         />
-        <MarketplaceHero />
+        <MarketplaceHero listings={listings} />
         <MarketplaceCategoryFilter
           activeCategory={activeCategory}
           resultCount={filtered.length}
@@ -118,6 +117,7 @@ export default function BrowsePage() {
           error={errorMessage}
           hasMore={hasMore}
           isLoadingMore={isLoadingMore}
+          loadMoreError={loadMoreError}
           onLoadMore={() => void loadMore()}
         />
 

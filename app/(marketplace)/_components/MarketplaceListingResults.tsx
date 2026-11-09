@@ -10,6 +10,7 @@ export default function MarketplaceListingResults({
   error,
   hasMore,
   isLoadingMore,
+  loadMoreError,
   onLoadMore,
 }: {
   events: Event[]
@@ -17,6 +18,7 @@ export default function MarketplaceListingResults({
   error: string | null
   hasMore: boolean
   isLoadingMore: boolean
+  loadMoreError: string | null
   onLoadMore: () => void
 }) {
   if (isLoading) {
@@ -42,6 +44,11 @@ export default function MarketplaceListingResults({
       </div>
       {hasMore ? (
         <div className="mt-8 text-center">
+          {loadMoreError ? (
+            <p className="mb-3 text-[13px] text-[#A03B32]" role="alert">
+              Unable to load more listings. {loadMoreError}
+            </p>
+          ) : null}
           <button
             type="button"
             onClick={onLoadMore}

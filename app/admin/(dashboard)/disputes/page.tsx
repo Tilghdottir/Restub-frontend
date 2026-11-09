@@ -9,7 +9,7 @@ import { ProtectedRoute } from "../../../../components/ui/ProtectedRoute"
 import DisputeActions from "./_components/DisputeActions"
 import DisputeEvidenceHistory from "./_components/DisputeEvidenceHistory"
 import DisputeQueue from "./_components/DisputeQueue"
-import { useAuth } from "../../../hooks/useAuth"
+import { useAuth } from "../../../../lib/auth/useAuth"
 import {
   useAssignDisputeMutation,
   useEscalateDisputeMutation,

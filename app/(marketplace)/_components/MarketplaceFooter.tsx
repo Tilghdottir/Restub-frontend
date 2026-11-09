@@ -1,3 +1,4 @@
+import Link from "next/link"
 import BrandLogo from "../../../components/ui/BrandLogo"
 
 export default function MarketplaceFooter() {
@@ -14,17 +15,21 @@ export default function MarketplaceFooter() {
           </p>
         </div>
         <div className="flex items-center gap-6">
-          {["Privacy Policy", "Terms of Service", "Seller FAQ", "Contact"].map(
-            (label) => (
-              <a
-                key={label}
-                href="#"
-                className="text-[12px] text-[#292B2F] transition-colors hover:opacity-70"
-              >
-                {label}
-              </a>
-            ),
-          )}
+          <Link
+            href="/privacy-policy"
+            className="text-[12px] text-[#292B2F] transition-colors hover:opacity-70"
+          >
+            Privacy Policy
+          </Link>
+          {["Terms of Service", "Seller FAQ", "Contact"].map((label) => (
+            <a
+              key={label}
+              href="#"
+              className="text-[12px] text-[#292B2F] transition-colors hover:opacity-70"
+            >
+              {label}
+            </a>
+          ))}
         </div>
       </div>
     </footer>

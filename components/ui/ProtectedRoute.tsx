@@ -3,8 +3,8 @@
 import type { ReactNode } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { useAuth } from "../../app/hooks/useAuth"
-import type { StaffPermission } from "../../app/hooks/useAuth"
+import { useAuth } from "../../lib/auth/useAuth"
+import type { StaffPermission } from "../../lib/auth/useAuth"
 import type { StaffRole } from "../../lib/auth/types"
 
 export function ProtectedRoute({

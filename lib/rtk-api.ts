@@ -36,6 +36,17 @@ export async function runQuery<T>(operation: () => Promise<T>) {
   }
 }
 
+export async function runVoidMutation(
+  operation: () => Promise<void>,
+): Promise<{ data: null } | { error: ApiFailure }> {
+  try {
+    await operation()
+    return { data: null }
+  } catch (error) {
+    return { error: asApiFailure(error) }
+  }
+}
+
 export function getApiErrorMessage(error: unknown, fallback: string): string {
   if (typeof error === "string") return error
   if (typeof error !== "object" || error === null) return fallback

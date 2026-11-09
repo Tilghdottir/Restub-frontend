@@ -1,5 +1,5 @@
 import { getCurrentUser, login, logout, register } from "./client"
-import { rtkApi, runQuery } from "../rtk-api"
+import { rtkApi, runQuery, runVoidMutation } from "../rtk-api"
 
 const authApi = rtkApi.injectEndpoints({
   endpoints: (builder) => ({
@@ -8,11 +8,12 @@ const authApi = rtkApi.injectEndpoints({
         queryFn: () => runQuery(() => getCurrentUser()),
         providesTags: ["AuthUser"],
       }),
-    login: builder.mutation<void, {
+    login: builder.mutation<null, {
       email: string
       password: string
     }>({
-      queryFn: ({ email, password }) => runQuery(() => login(email, password)),
+      queryFn: ({ email, password }) =>
+        runVoidMutation(() => login(email, password)),
       invalidatesTags: [
         "AuthUser",
         "AccountSummary",
@@ -28,16 +29,16 @@ const authApi = rtkApi.injectEndpoints({
         "Refunds",
       ],
     }),
-    register: builder.mutation<void, {
+    register: builder.mutation<null, {
       email: string
       password: string
       profile?: Parameters<typeof register>[2]
     }>({
       queryFn: ({ email, password, profile }) =>
-        runQuery(() => register(email, password, profile)),
+        runVoidMutation(() => register(email, password, profile)),
     }),
-    logout: builder.mutation<void, void>({
-      queryFn: () => runQuery(() => logout()),
+    logout: builder.mutation<null, void>({
+      queryFn: () => runVoidMutation(() => logout()),
       onQueryStarted: (_, { dispatch, queryFulfilled }) => {
         void queryFulfilled.then(
           () => dispatch(rtkApi.util.resetApiState()),

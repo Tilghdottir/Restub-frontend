@@ -1,4 +1,28 @@
-export default function MarketplaceHero() {
+import { formatNaira } from "../../../lib/money"
+import type { ListingSummary } from "../../../lib/listings/models"
+import { isTicketPackage } from "../../../lib/listings/ticket-types"
+
+export default function MarketplaceHero({
+  listings,
+}: {
+  listings: ListingSummary[]
+}) {
+  const featuredListing = listings.find(
+    (listing) => listing.eventTitle.trim().length > 0,
+  )
+  const isPackage = isTicketPackage(featuredListing?.ticketType)
+  const highlights = featuredListing
+    ? [
+        `${featuredListing.quantity} ${isPackage ? "package" : "ticket"}${
+          featuredListing.quantity === 1 ? "" : "s"
+        } available`,
+        featuredListing.ticketCategory,
+        `${formatNaira(featuredListing.askingPrice)} per ${
+          isPackage ? "package" : "ticket"
+        }`,
+      ].filter((highlight): highlight is string => Boolean(highlight?.trim()))
+    : []
+
   return (
     <div
       className="mb-8 overflow-hidden rounded-lg border bg-white"
@@ -10,44 +34,40 @@ export default function MarketplaceHero() {
             className="mb-3 text-[11px] font-medium tracking-widest uppercase"
             style={{ color: "#292B2F" }}
           >
-            New York City · September 2026
+            {featuredListing ? "Tickets available now" : "Restub marketplace"}
           </p>
           <h1
             className="mb-3 text-3xl leading-tight font-bold"
             style={{ color: "#111111" }}
           >
-            The best seats.
-            <br />
-            No surprises.
+            {featuredListing?.eventTitle ?? "Find tickets to live events."}
           </h1>
           <p
             className="mb-6 text-[14px] leading-relaxed"
             style={{ color: "#292B2F" }}
           >
-            Guaranteed authentic tickets to every concert, game, and show —
-            transparent pricing, no hidden fees.
+            {featuredListing
+              ? [featuredListing.venue, featuredListing.date]
+                  .filter((detail) => detail.trim())
+                  .join(" · ") || "View listing details before you buy."
+              : "Browse available tickets and review listing details before you buy."}
           </p>
-          <div className="flex flex-wrap items-center gap-4">
-            {[
-              { label: "Verified sellers", icon: "★" },
-              { label: "Instant e-delivery", icon: "↓" },
-              { label: "Money-back guarantee", icon: "✓" },
-            ].map(({ label, icon }) => (
-              <div
-                key={label}
-                className="flex items-center gap-1.5 text-[12px]"
-                style={{ color: "#292B2F" }}
-              >
-                <span
-                  className="text-[11px] font-bold"
-                  style={{ color: "#111111" }}
+          {highlights.length > 0 ? (
+            <div className="flex flex-wrap items-center gap-4">
+              {highlights.map((label) => (
+                <div
+                  key={label}
+                  className="flex items-center gap-1.5 text-[12px]"
+                  style={{ color: "#292B2F" }}
                 >
-                  {icon}
-                </span>
-                {label}
-              </div>
-            ))}
-          </div>
+                  <span className="text-[11px] font-bold text-[#111111]">
+                    •
+                  </span>
+                  {label}
+                </div>
+              ))}
+            </div>
+          ) : null}
         </div>
         <div className="hidden bg-gray-100 md:block" style={{ minHeight: 240 }}>
           <img

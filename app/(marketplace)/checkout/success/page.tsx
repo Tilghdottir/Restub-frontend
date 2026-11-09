@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { useEffect, useState } from "react"
 import Header from "../../../../components/ui/Header"
-import { useAuth } from "../../../hooks/useAuth"
+import { useAuth } from "../../../../lib/auth/useAuth"
 import { useLazyGetOrderDetailQuery } from "../../../../lib/orders/rtk"
 import { getSupportMailto } from "../../../../lib/support"
 

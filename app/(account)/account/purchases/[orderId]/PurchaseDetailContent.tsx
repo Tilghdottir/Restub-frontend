@@ -3,7 +3,7 @@
 import Link from "next/link"
 import AccountSidebar from "../../../../../components/account/AccountSidebar"
 import { useEffect, useState } from "react"
-import { useAuth } from "../../../../hooks/useAuth"
+import { useAuth } from "../../../../../lib/auth/useAuth"
 import { getApiErrorMessage } from "../../../../../lib/rtk-api"
 import {
   useAcceptOrderDeliveryMutation,

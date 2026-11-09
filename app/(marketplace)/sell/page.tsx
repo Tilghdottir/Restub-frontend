@@ -9,6 +9,7 @@ import ManualEventFields from "./_components/ManualEventFields"
 import ManualPartnerFields from "./_components/ManualPartnerFields"
 import PartnerSelector from "./_components/PartnerSelector"
 import CatalogEventSelector from "./_components/CatalogEventSelector"
+import { useDebouncedValue } from "./_hooks/useDebouncedValue"
 import AccountSidebar from "../../../components/account/AccountSidebar"
 import ApiErrorNotice from "../../../components/ui/ApiErrorNotice"
 import { ProtectedRoute } from "../../../components/ui/ProtectedRoute"
@@ -191,17 +192,21 @@ export default function SellPage() {
   )
   const isManualPartner = partnerId === MANUAL_SELECTION
   const partnerSearchTerm = manualPartnerUrl.trim() || manualPartnerName.trim()
+  const debouncedPartnerSearchTerm = useDebouncedValue(partnerSearchTerm, 250)
   useEffect(() => {
     if (!isManualPartner || partnerSearchTerm.length < 2) {
       setSearchedPartnerTerm("")
       return
     }
-    const timer = window.setTimeout(() => {
-      setSearchedPartnerTerm(partnerSearchTerm)
-      void searchEventPartners(partnerSearchTerm)
-    }, 250)
-    return () => window.clearTimeout(timer)
-  }, [isManualPartner, partnerSearchTerm, searchEventPartners])
+    if (debouncedPartnerSearchTerm !== partnerSearchTerm) return
+    setSearchedPartnerTerm(partnerSearchTerm)
+    void searchEventPartners(partnerSearchTerm)
+  }, [
+    isManualPartner,
+    partnerSearchTerm,
+    debouncedPartnerSearchTerm,
+    searchEventPartners,
+  ])
   const {
     currentData: events = [],
     error: eventsError,

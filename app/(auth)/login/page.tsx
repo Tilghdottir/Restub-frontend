@@ -4,8 +4,9 @@ import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import BrandLogo from "../../../components/ui/BrandLogo"
 import { getApiErrorMessage } from "../../../lib/rtk-api"
-import { useLoginMutation } from "../../../lib/auth/rtk"
+import { useGetCurrentUserQuery, useLoginMutation } from "../../../lib/auth/rtk"
 import { getCurrentUser } from "../../../lib/auth/client"
+import { getSafeReturnPath } from "../../../lib/auth/redirects"
 
 export default function LoginPage() {
   const router = useRouter()
@@ -16,16 +17,50 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState("")
   const [adminLogin, setAdminLogin] = useState(pathname === "/admin/login")
+  const [nextPath, setNextPath] = useState<string | null>(null)
+  const [hasSubmitted, setHasSubmitted] = useState(false)
+  const {
+    data: currentUser,
+    isLoading: checkingSession,
+    isFetching: fetchingSession,
+  } = useGetCurrentUserQuery(undefined, { skip: nextPath === null })
 
   useEffect(() => {
-    const nextPath = new URLSearchParams(window.location.search).get("next")
+    const nextPath = getSafeReturnPath(
+      new URLSearchParams(window.location.search).get("next"),
+    )
+    setNextPath(nextPath)
     setAdminLogin(
-      pathname === "/admin/login" || nextPath?.startsWith("/admin") === true,
+      pathname === "/admin/login" ||
+        nextPath === "/admin" ||
+        nextPath?.startsWith("/admin/") === true,
     )
   }, [pathname])
 
+  useEffect(() => {
+    if (
+      !nextPath ||
+      hasSubmitted ||
+      checkingSession ||
+      fetchingSession ||
+      !currentUser
+    ) {
+      return
+    }
+
+    router.replace(nextPath)
+  }, [
+    checkingSession,
+    currentUser,
+    fetchingSession,
+    hasSubmitted,
+    nextPath,
+    router,
+  ])
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setHasSubmitted(true)
     setError("")
     if (!email || !password) {
       setError("Please fill in all fields.")
@@ -34,7 +69,13 @@ export default function LoginPage() {
     try {
       await login({ email, password }).unwrap()
       const profile = await getCurrentUser()
+      if (!profile) {
+        throw new Error("Unable to load your account after signing in.")
+      }
       window.localStorage.setItem("restub_email", email)
+      const nextPath = getSafeReturnPath(
+        new URLSearchParams(window.location.search).get("next"),
+      )
       if (adminLogin) {
         if (!profile.permissions.length) {
           setError(
@@ -42,7 +83,6 @@ export default function LoginPage() {
           )
           return
         }
-        const nextPath = new URLSearchParams(window.location.search).get("next")
         router.push(
           nextPath?.startsWith("/admin/") && nextPath !== "/admin/login"
             ? nextPath
@@ -51,7 +91,10 @@ export default function LoginPage() {
         return
       }
       router.push(
-        profile.permissions.includes("platform:read") ? "/admin" : "/account",
+        nextPath ??
+          (profile.permissions.includes("platform:read")
+            ? "/admin"
+            : "/account"),
       )
     } catch (error) {
       setError(getApiErrorMessage(error, "Unable to sign in."))

@@ -11,6 +11,7 @@ const nextConfig: NextConfig = {
   allowedDevOrigins: [
     "http://localhost:3000",
     "http://localhost:3001",
+    "http://localhost:3011",
     "https://pastime-earthlike-overeater.ngrok-free.dev",
   ],
 }

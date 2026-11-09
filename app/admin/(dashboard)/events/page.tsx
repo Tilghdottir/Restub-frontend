@@ -9,7 +9,7 @@ import { ProtectedRoute } from "../../../../components/ui/ProtectedRoute"
 import CatalogEventDetails from "./_components/CatalogEventDetails"
 import CatalogEventList from "./_components/CatalogEventList"
 import PendingEventReviewQueue from "./_components/PendingEventReviewQueue"
-import { useAuth } from "../../../hooks/useAuth"
+import { useAuth } from "../../../../lib/auth/useAuth"
 import {
   useApprovePendingEventMutation,
   useGetAdminCatalogEventsQuery,

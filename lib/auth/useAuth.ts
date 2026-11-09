@@ -1,8 +1,8 @@
 "use client"
 
-import { useGetCurrentUserQuery } from "../../lib/auth/rtk"
-import type { StaffPermission, StaffRole } from "../../lib/auth/types"
-export { STAFF_PERMISSIONS, type StaffPermission } from "../../lib/auth/types"
+import { useGetCurrentUserQuery } from "./rtk"
+import type { StaffPermission, StaffRole } from "./types"
+export { STAFF_PERMISSIONS, type StaffPermission } from "./types"
 const adminRoles = ["admin", "superadmin"] as const
 
 export type AuthUser = {
